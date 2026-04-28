@@ -1,0 +1,55 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install docs deps
+        run: uv sync --group docs
+
+      - name: Configure git for mike
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy dev docs (push to main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          uv run mike deploy --push --update-aliases dev
+          if ! uv run mike list 2>/dev/null | grep -qE '^[0-9]'; then
+            uv run mike set-default --push dev
+          fi
+
+      - name: Deploy versioned docs (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION" =~ (rc|a|b|dev|alpha|beta) ]]; then
+            uv run mike deploy --push "$VERSION"
+          else
+            uv run mike deploy --push --update-aliases "$VERSION" latest
+            uv run mike set-default --push latest
+          fi
