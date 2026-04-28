@@ -1,0 +1,96 @@
+site_name: MacroTrace Documentation
+site_url: https://john-ramsey.github.io/macrotrace/
+repo_url: https://github.com/john-ramsey/macrotrace
+repo_name: john-ramsey/macrotrace
+
+extra:
+  version:
+    provider: mike
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+  - User Guide:
+      - Overview: guide/overview.md
+      - Graphing: guide/graphing.md
+  - Sources:
+      - FRED: sources/fred.md
+      - ONS: sources/ons.md
+      - Custom Data: sources/custom.md
+  - Workflows:
+      - Reconstructing the Real-Time View: workflows/reconstructing-the-real-time-view.md
+      - First Release vs Final Release: workflows/first-release-vs-final-release.md
+      - Reproducible Research / Frozen Snapshots: workflows/reproducible-research-frozen-snapshots.md
+      - Detecting Metadata Changes and Benchmark Revisions: workflows/detecting-metadata-changes-and-benchmark-revisions.md
+      - Using Your Own Revisioned Data: workflows/using-your-own-revisioned-data.md
+      - Revision Diagnostics for Researchers: workflows/revision-diagnostics-for-researchers.md
+      - MacroTrace with Darts: workflows/macrotrace-with-darts.md
+  - API Reference:
+      - Core Models:
+          - Time Series: api/macrotrace/time_series.md
+          - Observations: api/macrotrace/observations.md
+          - Series Metadata: api/macrotrace/metadata.md
+          - Graphing: api/macrotrace/graphing.md
+      - Database:
+          - Models: api/db_models.md
+      - Data Sources:
+          - Base: api/sources/base.md
+          - FRED: api/sources/fred.md
+          - ONS: api/sources/ons.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            heading_level: 2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - attr_list
+  - md_in_html
