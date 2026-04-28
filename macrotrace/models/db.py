@@ -5,12 +5,13 @@ from peewee import (
     FloatField,
     ForeignKeyField,
     Model,
+    SqliteDatabase,
     TextField,
 )
-from playhouse.sqlite_ext import SqliteExtDatabase, JSONField
+from playhouse.sqlite_ext import JSONField
 import pandas as pd
 
-LOCAL_DATABASE = SqliteExtDatabase(
+LOCAL_DATABASE = SqliteDatabase(
     None,
     pragmas=(
         ("cache_size", -1024 * 32),  # 32MB page-cache.

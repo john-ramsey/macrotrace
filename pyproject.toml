@@ -1,6 +1,6 @@
 [project]
 name = "macrotrace"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A Python library for managing and analyzing macroeconomic time series data with vintage awareness."
 authors = [
     {name = "John Ramsey", email = "john@johnramsey.com"},
@@ -33,7 +33,7 @@ dependencies = [
     "darts>=0.35.0",
     "numpy>=2.2.4",
     "pandas>=2.2.3",
-    "peewee>=3.17.9",
+    "peewee>=4.0",
     "plotly>=6.0.1",
     "pytz>=2025.2",
     "requests>=2.32.3",
@@ -117,8 +117,11 @@ omit = [
 fail_under = 92
 
 [build-system]
-requires = ["hatchling>=1.27.0"]
+requires = ["hatchling>=1.27.0", "hatch-vcs>=0.4.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
