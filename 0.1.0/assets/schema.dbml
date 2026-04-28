@@ -1,0 +1,110 @@
+// MacroTrace database schema
+// Generated from macrotrace/models/db.py
+// Render at https://dbdiagram.io or with the dbml CLI.
+
+Project MacroTrace {
+  database_type: 'SQLite'
+  Note: '''
+    Schema for the local MacroTrace SQLite database.
+    Datasets are versioned via DatasetDimension validity windows
+    and immutable Releases. Observations live at the intersection
+    of a Series and a Release.
+  '''
+}
+
+Table Dataset {
+  id integer [pk, increment]
+  source text [not null]
+  dataset_id text [not null]
+
+  indexes {
+    (source, dataset_id) [unique]
+  }
+
+  Note: 'Identity of a dataset; versioning lives in DatasetDimension.'
+}
+
+Table DatasetDimension {
+  id integer [pk, increment]
+  dataset_id integer [not null, ref: > Dataset.id]
+  dataset_dimension_id text [not null, note: 'Source-assigned dimension id; stable across versions']
+  title text [not null]
+  type text [not null, note: "One of 'text', 'numeric', 'boolean'"]
+  frequency text [note: 'Pandas date offset string']
+  description text
+  units text
+  seasonal_adjustment text
+  valid_from datetime [not null]
+  valid_to datetime [note: 'Null means currently valid']
+  created_at datetime [not null]
+
+  indexes {
+    (dataset_id, dataset_dimension_id, valid_from) [unique]
+  }
+
+  Note: 'Versioned definition of a dataset dimension.'
+}
+
+Table Release {
+  id integer [pk, increment]
+  dataset_id integer [not null, ref: > Dataset.id]
+  release_date datetime [not null]
+  additional_metadata json
+  created_at datetime [not null]
+
+  indexes {
+    (dataset_id, release_date) [unique]
+  }
+
+  Note: 'Immutable point-in-time release of a dataset.'
+}
+
+Table ReleaseDimension {
+  id integer [pk, increment]
+  release_id integer [not null, ref: > Release.id]
+  dimension_id integer [not null, ref: > DatasetDimension.id]
+  created_at datetime [not null]
+
+  indexes {
+    (release_id, dimension_id) [unique]
+  }
+
+  Note: 'Association table linking a Release to the DatasetDimensions it includes.'
+}
+
+Table Series {
+  id integer [pk, increment]
+  dataset_id integer [not null, ref: > Dataset.id]
+  series_key json [not null]
+  created_at datetime [not null]
+
+  Note: 'A single series within a dataset, identified by a JSON dimension key.'
+}
+
+Table SeriesDimensionFilter {
+  id integer [pk, increment]
+  series_id integer [not null, ref: > Series.id]
+  dimension_id integer [not null, ref: > DatasetDimension.id]
+  value text [not null, note: 'Stored as text; cast based on dimension.type']
+
+  indexes {
+    (series_id, dimension_id, value) [unique]
+  }
+
+  Note: 'Concrete dimension value(s) that define a Series.'
+}
+
+Table Observation {
+  id integer [pk, increment]
+  series_id integer [not null, ref: > Series.id]
+  release_id integer [not null, ref: > Release.id]
+  observation_timestamp datetime [not null]
+  value float [note: 'Null if the observation is missing']
+  created_at datetime [not null]
+
+  indexes {
+    (release_id, observation_timestamp) [unique]
+  }
+
+  Note: 'A single observed value for a Series within a Release.'
+}
