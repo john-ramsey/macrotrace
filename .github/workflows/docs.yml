@@ -6,16 +6,15 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
-  group: docs-${{ github.ref }}
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # mike pushes versioned docs to gh-pages
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,3 +52,28 @@ jobs:
             uv run mike deploy --push --update-aliases "$VERSION" latest
             uv run mike set-default --push latest
           fi
+
+      - name: Checkout gh-pages for Pages upload
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages-build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
