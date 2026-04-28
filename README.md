@@ -1,8 +1,16 @@
 # MacroTrace
 
+[![PyPI version](https://img.shields.io/pypi/v/macrotrace.svg)](https://pypi.org/project/macrotrace/)
+[![Python versions](https://img.shields.io/pypi/pyversions/macrotrace.svg)](https://pypi.org/project/macrotrace/)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![CI](https://github.com/john-ramsey/macrotrace/actions/workflows/ci.yml/badge.svg)](https://github.com/john-ramsey/macrotrace/actions/workflows/ci.yml)
+[![Docs](https://github.com/john-ramsey/macrotrace/actions/workflows/docs.yml/badge.svg)](https://john-ramsey.github.io/macrotrace/)
+
 MacroTrace is a Python library for collecting, storing, and analyzing macroeconomic
 time-series vintages. It is designed for research workflows where the revision
 history matters just as much as the latest published value.
+
+**Documentation:** <https://john-ramsey.github.io/macrotrace/>
 
 Instead of treating a series as a single final dataset, MacroTrace helps you work
 with the sequence of releases that were available in real time. This makes it

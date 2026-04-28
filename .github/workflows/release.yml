@@ -22,6 +22,12 @@ jobs:
       - name: Validate metadata
         run: uvx twine check dist/*
 
+      - name: Smoketest wheel in clean env
+        run: |
+          uv venv .smoketest
+          uv pip install --python .smoketest/bin/python dist/macrotrace-*.whl
+          .smoketest/bin/python -c "from macrotrace import MTTimeSeries; print(MTTimeSeries)"
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
