@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from dateutil import parser as date_parser
 
 from macrotrace import MTTimeSeries
+from macrotrace._paths import resolve_db_path
 
 LOGGER = logging.getLogger("backstop_ingest")
 
@@ -101,6 +102,29 @@ ONS_SOURCES: Dict[str, Dict[str, object]] = {
     },
 }
 
+RTDSM_SOURCES: Dict[str, Dict[str, object]] = {
+    "real_gnp_gdp_quarterly_vintages": {
+        "dataset_id": "ROUTPUT",
+        "series_key": {"frequency": "Q"},
+    },
+    "nominal_gnp_gdp_quarterly_vintages": {
+        "dataset_id": "NOUTPUT",
+        "series_key": {"frequency": "Q"},
+    },
+    "real_consumption_quarterly_vintages": {
+        "dataset_id": "RCON",
+        "series_key": {"frequency": "Q"},
+    },
+    "unemployment_rate_quarterly_vintages": {
+        "dataset_id": "RUC",
+        "series_key": {"frequency": "Q"},
+    },
+    "nonfarm_payroll_monthly_vintages": {
+        "dataset_id": "EMPLOY",
+        "series_key": {"frequency": "M"},
+    },
+}
+
 
 @dataclass
 class IngestResult:
@@ -114,6 +138,47 @@ class IngestResult:
     latest_release_date: Optional[str]
     series_key: Optional[Dict[str, str]] = None
     error: Optional[str] = None
+
+
+def _reset_local_db() -> None:
+    """
+    Drop every MacroTrace table so each backstop run starts from a clean DB.
+
+    Binds LOCAL_DATABASE to the resolved DB path (explicit arg -> the
+    ``MACROTRACE_DB`` env var -> ``MacroTrace.db`` in the cwd) and uses the
+    project's drop_tables helper. The tables are recreated automatically on the
+    first ingest. The request cache is intentionally left alone so RTDSM is not
+    re-downloaded from the Philadelphia Fed.
+    """
+    from macrotrace.models import (
+        LOCAL_DATABASE,
+        Dataset,
+        DatasetDimension,
+        Release,
+        ReleaseDimension,
+        Series,
+        SeriesDimensionFilter,
+        Observation,
+    )
+    from macrotrace.sources import create_tables, drop_tables
+
+    tables = [
+        Dataset,
+        DatasetDimension,
+        Release,
+        ReleaseDimension,
+        Series,
+        SeriesDimensionFilter,
+        Observation,
+    ]
+    db_path = resolve_db_path()
+    LOCAL_DATABASE.init(db_path)
+    # create_tables uses IF NOT EXISTS, so this is a no-op when the DB already
+    # has them and it guarantees the drop below won't fail on a first run where
+    # the DB file does not exist yet.
+    create_tables(LOCAL_DATABASE, tables)
+    drop_tables(LOCAL_DATABASE, tables)
+    LOGGER.info("Reset local DB %s (dropped %d tables)", db_path, len(tables))
 
 
 def _parse_date_to_utc(date_value: str) -> datetime:
@@ -186,7 +251,7 @@ def _ingest_one(
 
 def _build_cli() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run external ingest backstop (10 FRED + 10 ONS) via MTTimeSeries."
+        description="Run external ingest backstop (FRED + ONS + RTDSM) via MTTimeSeries."
     )
     parser.add_argument(
         "--vintage-start-date",
@@ -220,6 +285,9 @@ def main() -> int:
         level=getattr(logging, args.log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    # Always start from a clean database so each run is reproducible.
+    _reset_local_db()
 
     if not os.getenv("FRED_API_KEY"):
         LOGGER.error("FRED_API_KEY is not set; FRED ingestion cannot run.")
@@ -285,6 +353,33 @@ def main() -> int:
         results.append(result)
         LOGGER.info(
             "ONS %s: %s (vintages=%d, latest_obs=%d, %.2fs)",
+            result.status,
+            source_name,
+            result.vintages_available,
+            result.latest_observation_count,
+            result.duration_seconds,
+        )
+
+    LOGGER.info("Starting RTDSM ingest (%d sources)", len(RTDSM_SOURCES))
+    for source_name, config in RTDSM_SOURCES.items():
+        dataset_id = str(config["dataset_id"])
+        series_key = config.get("series_key")
+        if not isinstance(series_key, dict):
+            raise ValueError(
+                f"RTDSM source '{source_name}' must define a dict series_key."
+            )
+
+        LOGGER.info("RTDSM start: %s (%s)", source_name, dataset_id)
+        result = _ingest_one(
+            source="rtdsm",
+            source_name=source_name,
+            dataset_id=dataset_id,
+            series_key=series_key,  # type: ignore[arg-type]
+            vintage_start_date=vintage_start_date,
+        )
+        results.append(result)
+        LOGGER.info(
+            "RTDSM %s: %s (vintages=%d, latest_obs=%d, %.2fs)",
             result.status,
             source_name,
             result.vintages_available,

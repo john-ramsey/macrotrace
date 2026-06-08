@@ -19,7 +19,7 @@ known at different publication dates.
 
 ## Features
 
-- Fetch vintage-aware macroeconomic time series from FRED and ONS
+- Fetch vintage-aware macroeconomic time series from FRED, ONS, and the Philadelphia Fed's Real-Time Data Set (RTDSM)
 - Store releases locally in SQLite for reproducible, offline-friendly workflows
 - Retrieve series as they were known on a specific date with `as_of(...)`
 - Filter both vintage windows and data windows when loading a series
@@ -86,6 +86,23 @@ gdp = MTTimeSeries(
     },
 )
 ```
+
+The Philadelphia Fed's Real-Time Data Set (RTDSM) needs no API key. Use the
+series mnemonic as the `dataset_id` and select the vintage frequency with the
+`series_key`:
+
+```python
+from macrotrace import MTTimeSeries
+
+routput = MTTimeSeries(
+    dataset_id="ROUTPUT",
+    source="RTDSM",
+    series_key={"frequency": "Q"},
+)
+```
+
+See the [RTDSM source guide](docs/sources/rtdsm.md) for the full list of series
+and details on vintage frequencies.
 
 ## Command-Line Tools
 

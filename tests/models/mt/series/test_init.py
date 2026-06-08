@@ -275,6 +275,10 @@ def test_get_update_manager_success(empty_timeseries):
 
     for source in valid_sources:
         empty_timeseries.source = source
+        # RTDSM validates its dataset_id against the bundled catalog at
+        # construction (fail-fast), so give it a real series id; the other
+        # sources accept any id.
+        empty_timeseries.dataset_id = "ROUTPUT" if source == "RTDSM" else "TEST"
         update_manager = empty_timeseries._get_update_manager()
 
         assert isinstance(update_manager, UpdateManager)

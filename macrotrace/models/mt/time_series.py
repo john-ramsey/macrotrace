@@ -28,7 +28,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-VALID_SOURCES = ["FRED", "ONS", "USER"]
+VALID_SOURCES = ["FRED", "ONS", "RTDSM", "USER"]
 # USER is for user provided data, not from an API
 
 
@@ -882,10 +882,12 @@ class MTTimeSeries:
         """
         from macrotrace.sources.fred import FredUpdateManager
         from macrotrace.sources.ons import ONSUpdateManager
+        from macrotrace.sources.rtdsm import RTDSMUpdateManager
 
         source_managers = {
             "FRED": FredUpdateManager,
             "ONS": ONSUpdateManager,
+            "RTDSM": RTDSMUpdateManager,
         }
 
         assert (
