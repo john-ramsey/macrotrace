@@ -396,7 +396,7 @@ class MTTimeSeriesPlotter:
             )
 
         rows = []
-        for vintage in self.ts._vintages_including_current_series():
+        for vintage in self.ts._vintages_including_current_series:
             seasonal_period = vintage.metadata.get_frequency_as_numeric()
             minimum_observations = 2 * seasonal_period
             if len(vintage.current_observations) < minimum_observations:

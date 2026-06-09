@@ -5,7 +5,12 @@ import pandas as pd
 import numpy as np
 from darts import TimeSeries
 
-from macrotrace.models import MTTimeSeries, MTObservation, MTSeriesMetadata
+from macrotrace.models import (
+    MTTimeSeries,
+    MTObservation,
+    MTSeriesMetadata,
+    VintageMatch,
+)
 from tests.models.mt.utils import (
     sample_time_series,
     sample_time_series_with_revisions,
@@ -58,7 +63,7 @@ def test_repr_observation_limit(sample_time_series_with_revisions):
     assert str(last_obs.release_date.date()) in output
 
 
-def test_get_timestamp_formats(empty_timeseries):
+def test_timestamp_formats(empty_timeseries):
     """Test that various frequencies return the correct timestamp formats."""
     frequencies_and_formats = {
         "D": "%Y-%m-%d",
@@ -72,25 +77,25 @@ def test_get_timestamp_formats(empty_timeseries):
 
     for freq, expected_format in frequencies_and_formats.items():
         empty_timeseries.metadata = MagicMock(frequency=freq)
-        format_str = empty_timeseries._get_timestamp_format()
+        format_str = empty_timeseries._timestamp_format
         assert format_str == expected_format, f"Failed for frequency: {freq}"
 
 
-def test_get_timestamp_format_no_frequency(empty_timeseries):
+def test_timestamp_format_no_frequency(empty_timeseries):
     """Test that no frequency returns date-only format."""
     empty_timeseries.metadata = MagicMock(frequency=None)
-    format_str = empty_timeseries._get_timestamp_format()
+    format_str = empty_timeseries._timestamp_format
     assert format_str == "%Y-%m-%d"
 
 
-def test_get_timestamp_format_invalid_frequency_raises_error(empty_timeseries):
+def test_timestamp_format_invalid_frequency_raises_error(empty_timeseries):
     """Test that invalid frequency defaults to date-only format."""
     empty_timeseries.metadata = MagicMock(frequency="INVALID")
     with pytest.raises(
         ValueError,
         match="Invalid frequency: INVALID",
     ):
-        empty_timeseries._get_timestamp_format()
+        empty_timeseries._timestamp_format
 
 
 def test_to_dataframe(sample_time_series_with_revisions):
@@ -203,6 +208,39 @@ def test_to_dataframe_pct_change(sample_time_series):
     assert df["value"].iloc[0] == pytest.approx(1.00, abs=1e-2)
     # The percentage change from 113 to 114 is approximately 0.88%
     assert df["value"].iloc[-1] == pytest.approx(0.88, abs=1e-2)
+
+
+def test_to_series(sample_time_series_with_revisions):
+    series = sample_time_series_with_revisions.to_series()
+    df = sample_time_series_with_revisions.to_dataframe()
+
+    assert isinstance(series, pd.Series)
+    # Values indexed by observation timestamp, named after the dataset.
+    assert series.index.name == "timestamp"
+    assert series.name == sample_time_series_with_revisions.dataset_id
+    assert list(series.index) == list(df["timestamp"])
+    assert list(series.values) == list(df["value"])
+
+
+def test_to_series_matches_to_dataframe_across_modes(sample_time_series):
+    # to_series is a thin wrapper, so it must inherit to_dataframe's mode handling.
+    for mode in ("default", "first_difference", "pct_change"):
+        series = sample_time_series.to_series(mode=mode)
+        df = sample_time_series.to_dataframe(mode=mode)
+        assert len(series) == len(df)
+        assert list(series.values) == list(df["value"])
+
+
+def test_to_series_tz_handling(sample_time_series):
+    assert str(sample_time_series.to_series(tz="utc").index.tz) == "UTC"
+    # tz="source" yields a tz-naive index on the source wall-clock calendar.
+    assert sample_time_series.to_series(tz="source").index.tz is None
+
+
+def test_to_series_invalid_mode_raises(sample_time_series):
+    # Validation lives in to_dataframe and should propagate unchanged.
+    with pytest.raises(ValueError, match="Invalid mode"):
+        sample_time_series.to_series(mode="bogus")
 
 
 def test_generate_vintage_matrix(sample_time_series, expected_vintage_matrix):
@@ -358,7 +396,7 @@ def test_is_revision_successful_same_values(empty_timeseries):
 
 
 def test_vintages_including_current_series_includes_current(sample_time_series):
-    vintages = sample_time_series._vintages_including_current_series()
+    vintages = sample_time_series._vintages_including_current_series
     assert len(vintages) == len(sample_time_series.vintages) + 1
     assert sample_time_series in vintages
 
@@ -599,7 +637,7 @@ def test_get_historical_metadata_no_changes(sample_time_series):
     assert len(historical_metadata) == 1
     # The key should be the earliest vintage date
     earliest_vintage_date = min(
-        v.release_date for v in sample_time_series._vintages_including_current_series()
+        v.release_date for v in sample_time_series._vintages_including_current_series
     )
     assert earliest_vintage_date in historical_metadata
     assert historical_metadata[earliest_vintage_date] == sample_time_series.metadata
@@ -1227,3 +1265,180 @@ def test_return_first_vintages_all_na(empty_timeseries):
     assert first_vintages["timestamp"].iloc[0] == datetime(2024, 1, 1)
     assert first_vintages["first_vintage_date"].iloc[0] == "2024-01-01"
     assert first_vintages["value"].iloc[0] == 100.0
+
+
+def _vintage_with_release_date(
+    ts: MTTimeSeries, release_date: datetime
+) -> MTTimeSeries:
+    """Return the vintage in ``ts`` whose release date equals ``release_date``."""
+    for vintage in ts._vintages_including_current_series:
+        if vintage.release_date == release_date:
+            return vintage
+    raise AssertionError(f"No vintage with release date {release_date} in fixture.")
+
+
+def test_identify_vintage_exact_match(sample_time_series_with_revisions):
+    """A full vintage's data should resolve unambiguously to that vintage."""
+    target_release = datetime(2024, 12, 10, tzinfo=timezone.utc)
+    vintage = _vintage_with_release_date(
+        sample_time_series_with_revisions, target_release
+    )
+    candidate = vintage.to_series()
+
+    result = sample_time_series_with_revisions.identify_vintage(candidate)
+
+    assert isinstance(result, VintageMatch)
+    assert result.matched
+    assert not result.is_ambiguous
+    assert result.release_date == target_release
+    assert result.release_dates == [target_release]
+    assert result.n_observations == len(candidate)
+
+
+def test_identify_vintage_full_current_series_is_unique(sample_time_series):
+    """
+    The latest series carries observations no earlier vintage has, so feeding
+    it back in identifies the latest release even without revisions.
+    """
+    candidate = sample_time_series.to_series()
+
+    result = sample_time_series.identify_vintage(candidate)
+
+    assert result.matched
+    assert not result.is_ambiguous
+    assert result.release_date == sample_time_series.release_date
+
+
+def test_identify_vintage_ambiguous_window(sample_time_series):
+    """
+    A window of unrevised observations is consistent with every vintage that
+    covers it, so the match is ambiguous and release_date is None.
+    """
+    full = sample_time_series.to_series()
+    # An early three-observation window present (unchanged) in many vintages.
+    window = full.iloc[:3]
+
+    result = sample_time_series.identify_vintage(window)
+
+    assert result.matched
+    assert result.is_ambiguous
+    assert result.release_date is None
+    assert len(result.release_dates) > 1
+    # The first vintage covering the whole window is its release on 2024-12-04;
+    # 2024-12-03 only reaches the second observation so it cannot match.
+    assert datetime(2024, 12, 4, tzinfo=timezone.utc) in result.release_dates
+    assert datetime(2024, 12, 3, tzinfo=timezone.utc) not in result.release_dates
+    assert result.release_dates == sorted(result.release_dates)
+
+
+def test_identify_vintage_no_match(sample_time_series):
+    """Data whose values never appear in the sample matches nothing."""
+    full = sample_time_series.to_series()
+    candidate = pd.Series(9999.0, index=full.index)
+
+    result = sample_time_series.identify_vintage(candidate)
+
+    assert not result.matched
+    assert result.release_dates == []
+    assert result.release_date is None
+
+
+def test_identify_vintage_respects_tolerance(sample_time_series_with_revisions):
+    """Tiny perturbations match; larger ones only match with a looser tolerance."""
+    target_release = datetime(2024, 12, 10, tzinfo=timezone.utc)
+    vintage = _vintage_with_release_date(
+        sample_time_series_with_revisions, target_release
+    )
+    candidate = vintage.to_series()
+
+    # Within the default tolerance the match is unchanged.
+    nudged = candidate + 1e-7
+    assert (
+        sample_time_series_with_revisions.identify_vintage(nudged).release_date
+        == target_release
+    )
+
+    # Half a unit is well outside the default tolerance: nothing matches.
+    perturbed = candidate + 0.5
+    assert not sample_time_series_with_revisions.identify_vintage(perturbed).matched
+
+    # Loosening the absolute tolerance brings the perturbed data back into range.
+    assert sample_time_series_with_revisions.identify_vintage(
+        perturbed, atol=1.0
+    ).matched
+
+
+def test_identify_vintage_naive_index_assumes_utc(
+    sample_time_series_with_revisions, caplog
+):
+    """A tz-naive index is assumed to be UTC (with a warning) and still matches."""
+    target_release = datetime(2024, 12, 10, tzinfo=timezone.utc)
+    vintage = _vintage_with_release_date(
+        sample_time_series_with_revisions, target_release
+    )
+    candidate = vintage.to_series()
+    candidate.index = candidate.index.tz_localize(None)
+
+    result = sample_time_series_with_revisions.identify_vintage(candidate)
+
+    assert "series index has no timezone information. Assuming UTC." in caplog.text
+    assert result.release_date == target_release
+
+
+def test_identify_vintage_require_exact_coverage(sample_time_series):
+    """
+    Exact coverage disambiguates a window: only the vintage whose timestamps
+    are exactly the window's timestamps matches.
+    """
+    full = sample_time_series.to_series()
+    window = full.iloc[:3]
+
+    result = sample_time_series.identify_vintage(window, require_exact_coverage=True)
+
+    # Only the 2024-12-04 release holds exactly these three observations.
+    assert result.release_date == datetime(2024, 12, 4, tzinfo=timezone.utc)
+
+
+def test_identify_vintage_repr_variants(sample_time_series):
+    """The repr communicates matched, ambiguous, and no-match outcomes."""
+    full = sample_time_series.to_series()
+
+    matched = sample_time_series.identify_vintage(full)
+    assert "matched vintage" in repr(matched)
+
+    ambiguous = sample_time_series.identify_vintage(full.iloc[:3])
+    assert "ambiguous" in repr(ambiguous)
+
+    no_match = sample_time_series.identify_vintage(pd.Series(9999.0, index=full.index))
+    assert "no matching vintage found" in repr(no_match)
+
+
+def test_identify_vintage_rejects_non_series(sample_time_series):
+    with pytest.raises(TypeError, match="series must be a pandas Series"):
+        sample_time_series.identify_vintage([1, 2, 3])
+
+
+def test_identify_vintage_rejects_empty_series(sample_time_series):
+    with pytest.raises(ValueError, match="series is empty"):
+        sample_time_series.identify_vintage(pd.Series(dtype=float))
+
+
+def test_identify_vintage_rejects_all_null_series(sample_time_series):
+    full = sample_time_series.to_series()
+    all_null = pd.Series(np.nan, index=full.index)
+    with pytest.raises(ValueError, match="no non-null observations"):
+        sample_time_series.identify_vintage(all_null)
+
+
+def test_identify_vintage_rejects_duplicate_index(sample_time_series):
+    full = sample_time_series.to_series()
+    duped = pd.concat([full.iloc[:2], full.iloc[:1]])
+    with pytest.raises(ValueError, match="duplicate timestamps"):
+        sample_time_series.identify_vintage(duped)
+
+
+@pytest.mark.filterwarnings("ignore:Could not infer format")
+def test_identify_vintage_rejects_non_date_index(sample_time_series):
+    candidate = pd.Series([100.0, 101.0], index=["not", "dates"])
+    with pytest.raises(ValueError, match="indexed by dates"):
+        sample_time_series.identify_vintage(candidate)

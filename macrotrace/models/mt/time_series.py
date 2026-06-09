@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING, List, Optional, Dict, Any
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from dateutil import parser
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
 from tabulate import tabulate
 from darts import TimeSeries
@@ -30,6 +31,71 @@ logger = logging.getLogger(__name__)
 
 VALID_SOURCES = ["FRED", "ONS", "RTDSM", "USER"]
 # USER is for user provided data, not from an API
+
+
+@dataclass
+class VintageMatch:
+    """
+    Result of matching an undated data series against the vintages of an MTTimeSeries (see ``MTTimeSeries.identify_vintage``).
+
+    A match is ambiguous when the supplied data is consistent with more than one vintage.
+    This is common when the data only covers observations that were never revised across a run of consecutive vintages, so the values alone cannot pin down a single release.
+
+    Attributes:
+        release_dates: Release dates of every vintage whose values matched the supplied data, sorted oldest to newest. Empty when nothing matched.
+        n_observations: Number of non-null observations from the supplied data that were compared against each vintage.
+        rtol: Relative tolerance used for the value comparison.
+        atol: Absolute tolerance used for the value comparison.
+    """
+
+    release_dates: List[datetime]
+    n_observations: int
+    rtol: float
+    atol: float
+
+    @property
+    def matched(self) -> bool:
+        """True if the supplied data matched at least one vintage."""
+        return len(self.release_dates) > 0
+
+    @property
+    def is_ambiguous(self) -> bool:
+        """True if the supplied data matched more than one vintage."""
+        return len(self.release_dates) > 1
+
+    @property
+    def release_date(self) -> Optional[datetime]:
+        """
+        The single matching vintage's release date.
+
+        Returns None when there was no match or when the match was ambiguous (more than one vintage matched).
+        Inspect ``release_dates`` in the ambiguous case.
+
+        Returns:
+            Optional[datetime]: The unambiguously matched release date, else None.
+        """
+        return self.release_dates[0] if len(self.release_dates) == 1 else None
+
+    def __repr__(self) -> str:
+        """
+        Returns a human-readable summary of the match result.
+
+        Returns:
+            str: String representation of the match result.
+        """
+        compared = f"compared {self.n_observations} observation(s)"
+        if not self.matched:
+            return f"VintageMatch(no matching vintage found; {compared})"
+        if self.is_ambiguous:
+            dates = ", ".join(d.strftime("%Y-%m-%d") for d in self.release_dates)
+            return (
+                f"VintageMatch(ambiguous - matched {len(self.release_dates)} "
+                f"vintages: {dates}; {compared})"
+            )
+        return (
+            f"VintageMatch(matched vintage "
+            f"{self.release_dates[0].strftime('%Y-%m-%d')}; {compared})"
+        )
 
 
 class MTTimeSeries:
@@ -254,15 +320,15 @@ class MTTimeSeries:
         """
 
         min_release_date = min(
-            [v.release_date for v in self._vintages_including_current_series()],
+            [v.release_date for v in self._vintages_including_current_series],
             default=None,
         )
         max_release_date = max(
-            [v.release_date for v in self._vintages_including_current_series()],
+            [v.release_date for v in self._vintages_including_current_series],
             default=None,
         )
 
-        timestamp_format = self._get_timestamp_format()
+        timestamp_format = self._timestamp_format
 
         title = f"{self.metadata.title}"
         header = f"\nTime Series: {self.dataset_id} ({title})"
@@ -348,6 +414,123 @@ class MTTimeSeries:
 
         return as_of_vintage
 
+    def identify_vintage(
+        self,
+        series: pd.Series,
+        rtol: float = 1e-05,
+        atol: float = 1e-08,
+        require_exact_coverage: bool = False,
+    ) -> VintageMatch:
+        """
+        Identify which vintage(s) a block of undated data came from.
+
+        Replication packages frequently ship a series of observations with no release date attached, only a source.
+        This compares the supplied data against every vintage in this MTTimeSeries and reports the release date(s) whose values it is consistent with, so you can recover the vintage you are actually working with.
+
+        The supplied data is treated as a (possibly incomplete) window of a vintage: every timestamp in ``series`` must be present in a vintage and its values must agree (within tolerance) for that vintage to match.
+        A vintage may carry extra observations the data does not include.
+        When the data does not change across consecutive vintages the match is necessarily ambiguous, and all consistent release dates are returned.
+
+        Args:
+            series (pd.Series): The undated data to identify, indexed by date.
+                The index becomes the observation timestamps and the values are compared against each vintage.
+                A tz-naive index is assumed to be UTC, and null values are dropped before matching.
+            rtol (float): Relative tolerance for the value comparison, passed through to ``numpy.isclose``. Defaults to 1e-05.
+            atol (float): Absolute tolerance for the value comparison, passed through to ``numpy.isclose``. Defaults to 1e-08.
+            require_exact_coverage (bool): If True, a vintage only matches when its timestamps are exactly the timestamps in ``series``, rather than allowing the data to be a sub-window of the vintage. Defaults to False.
+
+        Returns:
+            VintageMatch: The matching release date(s) and comparison details. Check ``matched`` to see whether at least one vintage matched.
+
+        Raises:
+            TypeError: If ``series`` is not a pandas Series.
+            ValueError: If ``series`` is empty, has a non-date or duplicated index, or contains no non-null observations.
+        """
+        candidate = self._prepare_candidate_series(series)
+
+        matches: List[datetime] = []
+        for vintage in self._vintages_including_current_series:
+            vintage_df = vintage.to_dataframe(mode="default", tz="utc")
+            vintage_series = vintage_df.set_index("timestamp")["value"]
+
+            # Every supplied timestamp must exist in the vintage, otherwise the data cannot be a window of it.
+            if not candidate.index.isin(vintage_series.index).all():
+                continue
+
+            # With exact coverage the vintage must hold exactly the supplied timestamps and nothing more.
+            if (
+                require_exact_coverage
+                and not vintage_series.index.isin(candidate.index).all()
+            ):
+                continue
+
+            aligned = vintage_series.reindex(candidate.index)
+            if np.isclose(
+                candidate.to_numpy(dtype=float),
+                aligned.to_numpy(dtype=float),
+                rtol=rtol,
+                atol=atol,
+            ).all():
+                matches.append(vintage.release_date)
+
+        return VintageMatch(
+            release_dates=sorted(matches),
+            n_observations=len(candidate),
+            rtol=rtol,
+            atol=atol,
+        )
+
+    def _prepare_candidate_series(self, series: pd.Series) -> pd.Series:
+        """
+        Validate and normalize a user-supplied data series for vintage matching.
+
+        Coerces the values to numeric, drops nulls, and renders the index as a sorted, unique, tz-aware UTC DatetimeIndex so it lines up with the timestamps produced by ``to_dataframe(tz="utc")``.
+
+        Args:
+            series (pd.Series): The user-supplied data indexed by date.
+
+        Returns:
+            pd.Series: The cleaned candidate series indexed by UTC timestamps.
+
+        Raises:
+            TypeError: If ``series`` is not a pandas Series.
+            ValueError: If ``series`` is empty, has a non-date or duplicated index, or contains no non-null observations.
+        """
+        if not isinstance(series, pd.Series):
+            raise TypeError(
+                f"series must be a pandas Series, got {type(series).__name__}."
+            )
+        if series.empty:
+            raise ValueError("The series is empty. There is nothing to match against.")
+
+        candidate = pd.to_numeric(series, errors="raise").dropna()
+        if candidate.empty:
+            raise ValueError("The series contains no non-null observations to match.")
+
+        try:
+            index = pd.to_datetime(candidate.index)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                "The series must be indexed by dates that pandas can parse."
+            ) from exc
+
+        if not isinstance(index, pd.DatetimeIndex):
+            raise ValueError("The series must be indexed by dates, not scalar values.")
+
+        if index.tz is None:
+            logger.warning(
+                "The series index has no timezone information. Assuming UTC."
+            )
+            index = index.tz_localize("UTC")
+        else:
+            index = index.tz_convert("UTC")
+
+        if index.has_duplicates:
+            raise ValueError("The series index contains duplicate timestamps.")
+
+        candidate.index = index
+        return candidate.sort_index()
+
     ### Theoretically if the units change, we should not be able to compare them
     def generate_vintage_matrix(self) -> pd.DataFrame:
         """
@@ -360,7 +543,7 @@ class MTTimeSeries:
         """
 
         vintage_dfs = [
-            v.to_dataframe() for v in self._vintages_including_current_series()
+            v.to_dataframe() for v in self._vintages_including_current_series
         ]
 
         merged_df = pd.concat(vintage_dfs, axis=0, ignore_index=True)
@@ -414,7 +597,7 @@ class MTTimeSeries:
         historical_metadata = {}
 
         # Iterate forward through vintages to find first appearance of each metadata
-        all_vintages = self._vintages_including_current_series()
+        all_vintages = self._vintages_including_current_series
 
         if not all_vintages:
             return historical_metadata
@@ -573,7 +756,7 @@ class MTTimeSeries:
                 ]
             )
 
-            # utc=True is required: source-localised observations carry per-row pytz
+            # utc=True is required: source-localized observations carry per-row pytz
             # tzinfo objects (e.g. distinct CST and CDT singletons from
             # America/Chicago), and pandas refuses to build a single datetime64[ns, tz]
             # column from mixed offsets without it. Anchoring on UTC preserves
@@ -593,6 +776,27 @@ class MTTimeSeries:
 
         return df
 
+    def to_series(self, mode: str = "default", tz: str = "utc") -> pd.Series:
+        """
+        Converts the current observations of the time series to a date-indexed pandas Series.
+
+        This is the values-only counterpart to ``to_dataframe``: the observation timestamps become the index and the values become the data.
+        The Series is named after ``dataset_id`` so it carries a meaningful label when plotted or concatenated alongside other series.
+
+        Args:
+            mode (str, optional): The mode for which the series is provided.
+                Supports "default" (unmodified observations), "first_difference" (first differences of observations), and "pct_change" (percentage change of observations).
+                Defaults to "default".
+            tz (str, optional): How to render the index. ``"utc"`` (default) returns a tz-aware UTC index; ``"source"`` returns a tz-naive index on the source's wall-clock calendar. See ``to_dataframe`` for the full explanation.
+
+        Returns:
+            pd.Series: The observation values indexed by timestamp, named after the dataset_id.
+        """
+        df = self.to_dataframe(mode=mode, tz=tz)
+        series = df.set_index("timestamp")["value"]
+        series.name = self.dataset_id
+        return series
+
     def _find_eligible_vintages(self, target_date: datetime) -> List["MTTimeSeries"]:
         """
         Finds eligible vintages based on (before or equal to) the target date.
@@ -605,7 +809,7 @@ class MTTimeSeries:
         """
         return [
             v
-            for v in self._vintages_including_current_series()
+            for v in self._vintages_including_current_series
             if v.release_date <= target_date
         ]
 
@@ -625,10 +829,11 @@ class MTTimeSeries:
         inferred_freq = pd.infer_freq(pd.DatetimeIndex(timestamps))
         return inferred_freq
 
-    def _get_timestamp_format(self) -> str:
+    @property
+    def _timestamp_format(self) -> str:
         """
-        Returns the appropriate strftime format string based on the series frequency.
-        Subdaily frequencies include time and timezone, while daily and above show only the date.
+        The appropriate strftime format string based on the series frequency.
+        Sub-daily frequencies include time and timezone, while daily and above show only the date.
 
         Returns:
             str: The strftime format string.
@@ -637,14 +842,14 @@ class MTTimeSeries:
             return "%Y-%m-%d"
 
         # Create a base date and add one frequency period to it
-        # If the difference is less than 1 day, it's a subdaily frequency
+        # If the difference is less than 1 day, it's a sub-daily frequency
         base_date = pd.Timestamp("2020-01-01")
         next_date = base_date + pd.tseries.frequencies.to_offset(
             self.metadata.frequency
         )
-        is_subdaily = (next_date - base_date) < pd.Timedelta(days=1)
+        is_sub_daily = (next_date - base_date) < pd.Timedelta(days=1)
 
-        if is_subdaily:
+        if is_sub_daily:
             return "%Y-%m-%d %H:%M:%S %Z"
         else:
             return "%Y-%m-%d"
@@ -843,8 +1048,9 @@ class MTTimeSeries:
         )
         return releases
 
-    def _describe_vintage_window(self) -> str:
-        """Return a human-readable description of the requested vintage window."""
+    @property
+    def _vintage_window_description(self) -> str:
+        """A human-readable description of the requested vintage window."""
         fmt = "%Y-%m-%d"
         start = (
             self.vintage_start_date.astimezone(timezone.utc).strftime(fmt)
@@ -865,9 +1071,10 @@ class MTTimeSeries:
             return f"on or before {end}"
         return "for all vintages"
 
+    @property
     def _vintages_including_current_series(self) -> List["MTTimeSeries"]:
         """
-        Get a list of all vintages including the current series.
+        A list of all vintages including the current series.
 
         Returns:
             List[MTTimeSeries]: A list of all vintages including the current series.
@@ -1025,7 +1232,7 @@ class MTTimeSeries:
                     f"No vintages available for dataset {state.dataset.dataset_id} "
                     f"and series key {state.series.series_key} "
                     f"within the requested vintage window "
-                    f"({self._describe_vintage_window()})."
+                    f"({self._vintage_window_description})."
                 )
             raise ValueError(
                 f"No time series data found for dataset {state.dataset.dataset_id} "
