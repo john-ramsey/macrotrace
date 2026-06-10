@@ -275,6 +275,10 @@ def test_get_update_manager_success(empty_timeseries):
 
     for source in valid_sources:
         empty_timeseries.source = source
+        # RTDSM validates its dataset_id against the bundled catalog at
+        # construction (fail-fast), so give it a real series id; the other
+        # sources accept any id.
+        empty_timeseries.dataset_id = "ROUTPUT" if source == "RTDSM" else "TEST"
         update_manager = empty_timeseries._get_update_manager()
 
         assert isinstance(update_manager, UpdateManager)
@@ -1332,35 +1336,35 @@ def test_build_vintage_for_release_includes_prior_vintages():
     assert vintage.vintages[0] == mock_prior_vintage
 
 
-def test_describe_vintage_window_both_bounds(empty_timeseries):
+def test_vintage_window_description_both_bounds(empty_timeseries):
     """Both start and end produce a 'between ... and ...' description."""
     empty_timeseries.vintage_start_date = datetime(2024, 1, 1, tzinfo=UTC)
     empty_timeseries.vintage_end_date = datetime(2024, 6, 30, tzinfo=UTC)
     assert (
-        empty_timeseries._describe_vintage_window()
+        empty_timeseries._vintage_window_description
         == "between 2024-01-01 and 2024-06-30"
     )
 
 
-def test_describe_vintage_window_start_only(empty_timeseries):
+def test_vintage_window_description_start_only(empty_timeseries):
     """A start-only window renders as 'on or after'."""
     empty_timeseries.vintage_start_date = datetime(2024, 1, 1, tzinfo=UTC)
     empty_timeseries.vintage_end_date = None
-    assert empty_timeseries._describe_vintage_window() == "on or after 2024-01-01"
+    assert empty_timeseries._vintage_window_description == "on or after 2024-01-01"
 
 
-def test_describe_vintage_window_end_only(empty_timeseries):
+def test_vintage_window_description_end_only(empty_timeseries):
     """An end-only window renders as 'on or before'."""
     empty_timeseries.vintage_start_date = None
     empty_timeseries.vintage_end_date = datetime(2024, 6, 30, tzinfo=UTC)
-    assert empty_timeseries._describe_vintage_window() == "on or before 2024-06-30"
+    assert empty_timeseries._vintage_window_description == "on or before 2024-06-30"
 
 
-def test_describe_vintage_window_no_bounds(empty_timeseries):
+def test_vintage_window_description_no_bounds(empty_timeseries):
     """No bounds render as the catch-all message."""
     empty_timeseries.vintage_start_date = None
     empty_timeseries.vintage_end_date = None
-    assert empty_timeseries._describe_vintage_window() == "for all vintages"
+    assert empty_timeseries._vintage_window_description == "for all vintages"
 
 
 def test_load_state_from_db_raises_when_dataset_missing(empty_timeseries):

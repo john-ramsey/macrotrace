@@ -655,7 +655,7 @@ def test_plot_revision_success_cumulative_calculation(
 
 
 def test_plot_decomposition_across_vintages(sample_time_series):
-    all_vintages = sample_time_series._vintages_including_current_series()
+    all_vintages = sample_time_series._vintages_including_current_series
     eligible_vintages = []
 
     for i, vintage in enumerate(all_vintages):

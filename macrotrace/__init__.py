@@ -16,6 +16,7 @@ __all__ = [
     "MTSeriesMetadata",
     "MTTimeSeriesPlotter",
     "VintageComparison",
+    "VintageMatch",
     "__version__",
 ]
 
@@ -25,6 +26,7 @@ _LAZY_IMPORTS = {
     "MTSeriesMetadata": ("macrotrace.models.mt.series_metadata", "MTSeriesMetadata"),
     "MTTimeSeriesPlotter": ("macrotrace.models.mt.plotter", "MTTimeSeriesPlotter"),
     "VintageComparison": ("macrotrace.models.mt.analysis", "VintageComparison"),
+    "VintageMatch": ("macrotrace.models.mt.time_series", "VintageMatch"),
 }
 
 

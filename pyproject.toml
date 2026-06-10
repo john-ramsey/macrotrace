@@ -32,6 +32,7 @@ classifiers = [
 dependencies = [
     "darts>=0.35.0",
     "numpy>=2.2.4",
+    "openpyxl>=3.1.0",
     "pandas>=2.2.3",
     "peewee>=4.0",
     "plotly>=6.0.1",
