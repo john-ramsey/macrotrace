@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://john-ramsey.github.io/macrotrace/dev/sources/rtdsm/">
       
       
+        <link rel="prev" href="../ons/">
+      
+      
+        <link rel="next" href="../custom/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Real-Time Data Set for Macroeconomists (RTDSM) - MacroTrace Documentation</title>
+        <title>RTDSM - MacroTrace Documentation</title>
       
     
     
@@ -114,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Real-Time Data Set for Macroeconomists (RTDSM)
+              RTDSM
             
           </span>
         </div>
@@ -532,8 +536,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -543,6 +549,8 @@
       
         
       
+        
+      
     
     
     
@@ -552,13 +560,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -579,7 +585,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -641,6 +647,219 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RTDSM
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RTDSM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-macrotrace-accesses-rtdsm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How MacroTrace Accesses RTDSM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtdsm-data-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTDSM Data Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-vintage-frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Vintage Frequency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-series-mnemonics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding Series Mnemonics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monthly-refresh-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monthly Refresh Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saving-the-source-spreadsheets-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving the Source Spreadsheets (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unknown-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unknown series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frequency-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frequency not available
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1303,6 +1522,8 @@
       
         
       
+        
+      
     
     
     
@@ -1418,6 +1639,34 @@
     
   
     ONS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sources/rtdsm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RTDSM
   
 
     
@@ -1617,6 +1866,122 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#how-macrotrace-accesses-rtdsm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How MacroTrace Accesses RTDSM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtdsm-data-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTDSM Data Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-vintage-frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Vintage Frequency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-series-mnemonics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding Series Mnemonics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monthly-refresh-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monthly Refresh Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saving-the-source-spreadsheets-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving the Source Spreadsheets (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unknown-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unknown series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frequency-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frequency not available
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1639,14 +2004,151 @@
 
 <h1 id="real-time-data-set-for-macroeconomists-rtdsm">Real-Time Data Set for Macroeconomists (RTDSM)</h1>
 <h2 id="overview">Overview</h2>
-<p>Coming Soon</p>
+<p>The <strong>Real-Time Data Set for Macroeconomists (RTDSM)</strong> is a collection of vintages of U.S. macroeconomic data maintained by the Federal Reserve Bank of Philadelphia. RTDSM is a heavily used source in economic research for studying data revisions and for building real-time analyses, and it is based on the work of Croushore and Stark (2001).</p>
+<p>RTDSM has no API. The Philadelphia Fed publishes one spreadsheet per series containing the complete history of every vintage. MacroTrace downloads those spreadsheets and stores each vintage in the same data model used by the other sources, so RTDSM series behave like any other MacroTrace time series.</p>
 <h2 id="data-provider">Data Provider</h2>
 <ul>
 <li><strong>Maintained by</strong>: Federal Reserve Bank of Philadelphia</li>
 <li><strong>Website</strong>: <a href="https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/real-time-data-set-for-macroeconomists">https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/real-time-data-set-for-macroeconomists</a></li>
-<li><strong>Developer Hub</strong>: N/A</li>
 <li><strong>Data Access</strong>: Free, no API key required</li>
+<li><strong>Update cadence</strong>: All files are refreshed at the end of each month</li>
 </ul>
+<h2 id="how-macrotrace-accesses-rtdsm">How MacroTrace Accesses RTDSM</h2>
+<p>Because there is no API, MacroTrace downloads the published "full time series history" spreadsheet for a series and parses every vintage from it. You do not need to keep the Excel files on disk: the data is read into memory and written to the local database. If you would like to keep a copy of the source spreadsheets, you can provide a directory (see <a href="#saving-the-source-spreadsheets-optional">Saving the source spreadsheets</a>).</p>
+<h2 id="rtdsm-data-structure">RTDSM Data Structure</h2>
+<p>Each RTDSM series is identified by a short uppercase <code>dataset_id</code> (for example <code>ROUTPUT</code> for Real GNP/GDP, <code>RCON</code> for Real Personal Consumption Expenditures, <code>RUC</code> for the Unemployment Rate). These dataset IDs can be found on the <a href="https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/real-time-data-set-full-time-series-history">Philadelphia Fed's website</a> and are listed in <code>macrotrace.sources.rtdsm.RTDSM_CATALOG</code>.</p>
+<p>A single series can be published at more than one vintage frequency. The <code>series_key</code> selects which vintage frequency to load:</p>
+<ul>
+<li><code>{"frequency": "Q"}</code> loads the quarterly vintages of the series.</li>
+<li><code>{"frequency": "M"}</code> loads the monthly vintages of the series.</li>
+</ul>
+<p>The vintage frequency (how often a new snapshot is published) is independent of the data frequency (how often the underlying series is observed). For example, <code>RCON</code> is quarterly data that is published as both quarterly vintages and monthly vintages. The data frequency is fixed per series and is determined automatically, so you only ever choose the vintage frequency.</p>
+<h2 id="loading-data">Loading Data</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace</span><span class="w"> </span><span class="kn">import</span> <span class="n">MTTimeSeries</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Quarterly vintages of Real GNP/GDP</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">routput</span> <span class="o">=</span> <span class="n">MTTimeSeries</span><span class="p">(</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</code></pre></div>
+<p>The <code>frequency</code> key is optional. If you omit it, MacroTrace uses the series' only vintage frequency when there is just one, and defaults to quarterly when a series offers both.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># EMPLOY only has monthly vintages, so this loads the monthly vintages</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">employ</span> <span class="o">=</span> <span class="n">MTTimeSeries</span><span class="p">(</span><span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;EMPLOY&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>For reliable round trips (loading the same series again later without re-fetching), pass the <code>frequency</code> key explicitly so the stored series key and the requested series key always match.</p>
+<h2 id="choosing-the-vintage-frequency">Choosing the Vintage Frequency</h2>
+<p>Not every series offers both vintage frequencies. If you request a frequency a series does not provide, MacroTrace raises a clear error that lists what is available.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># DIV provides only quarterly vintages</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">MTTimeSeries</span><span class="p">(</span><span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;DIV&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">,</span> <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;M&quot;</span><span class="p">})</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># ValueError: RTDSM series DIV does not offer M-frequency vintages. Available: Q.</span>
+</code></pre></div>
+<p>Within a single database, load a given series at one vintage frequency. The quarterly and monthly vintages of the same series overlap (the mid-quarter monthly vintage is the same snapshot as the quarterly vintage, with identical values), so a series is best kept to one vintage frequency per database.</p>
+<h2 id="finding-series-mnemonics">Finding Series Mnemonics</h2>
+<p>Browse the full list of series and download pages here:</p>
+<ul>
+<li><a href="https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/real-time-data-set-full-time-series-history">Real-Time Data Set: Full Time Series History</a></li>
+</ul>
+<p>The mnemonic shown on each series page is the <code>dataset_id</code>. A few commonly used series:</p>
+<table>
+<thead>
+<tr>
+<th>Mnemonic</th>
+<th>Series</th>
+<th>Data frequency</th>
+<th>Vintage frequencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ROUTPUT</td>
+<td>Real GNP/GDP</td>
+<td>Quarterly</td>
+<td>Q, M</td>
+</tr>
+<tr>
+<td>NOUTPUT</td>
+<td>Nominal GNP/GDP</td>
+<td>Quarterly</td>
+<td>Q, M</td>
+</tr>
+<tr>
+<td>RCON</td>
+<td>Real Personal Consumption Expenditures</td>
+<td>Quarterly</td>
+<td>Q, M</td>
+</tr>
+<tr>
+<td>RUC</td>
+<td>Unemployment Rate</td>
+<td>Monthly</td>
+<td>Q</td>
+</tr>
+<tr>
+<td>EMPLOY</td>
+<td>Nonfarm Payroll Employment</td>
+<td>Monthly</td>
+<td>M</td>
+</tr>
+<tr>
+<td>CPI</td>
+<td>Consumer Price Index</td>
+<td>Monthly</td>
+<td>Q</td>
+</tr>
+<tr>
+<td>M1</td>
+<td>M1 Money Stock</td>
+<td>Monthly</td>
+<td>Q</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>M2 Money Stock</td>
+<td>Monthly</td>
+<td>Q</td>
+</tr>
+</tbody>
+</table>
+<p>The complete set of supported series is available in code as <code>macrotrace.sources.rtdsm.RTDSM_CATALOG</code>, which maps each mnemonic to its title, data frequency, and available vintage frequencies:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace.sources.rtdsm</span><span class="w"> </span><span class="kn">import</span> <span class="n">RTDSM_CATALOG</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">))</span>            <span class="c1"># 115</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">[</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">])</span>      <span class="c1"># title, data_freq, vintage_freqs</span>
+</code></pre></div>
+<h2 id="monthly-refresh-behavior">Monthly Refresh Behavior</h2>
+<p>RTDSM spreadsheets are refreshed only at the beginning of each month, so MacroTrace will not re-download a series from the Philadelphia Fed more than once per calendar month. After the first load in a month, subsequent loads of the same series are served from the local request cache without contacting the provider's website, no matter how many times you load it. At the start of the next month the file is fetched again.</p>
+<p>This behavior relies on the request cache, which is enabled by default. If you need to force a fresh download within the same month, delete the request cache file (<code>MacroTraceRequestCache.sqlite</code> by default, or the path given by the <code>MACROTRACE_CACHE</code> environment variable).</p>
+<h2 id="saving-the-source-spreadsheets-optional">Saving the Source Spreadsheets (Optional)</h2>
+<p>If you want to keep a copy of the downloaded Excel files, use the <code>RTDSMUpdateManager</code> directly with an <code>excel_dir</code>. It ingests the data into the database (and writes the spreadsheet to <code>excel_dir</code>); you can then read the series back through <code>MTTimeSeries</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace.sources.rtdsm</span><span class="w"> </span><span class="kn">import</span> <span class="n">RTDSMUpdateManager</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace</span><span class="w"> </span><span class="kn">import</span> <span class="n">MTTimeSeries</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Download, save the spreadsheet, and store every vintage</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">RTDSMUpdateManager</span><span class="p">(</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">excel_dir</span><span class="o">=</span><span class="s2">&quot;./rtdsm_files&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">()</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># Read the stored data back without re-fetching</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">routput</span> <span class="o">=</span> <span class="n">MTTimeSeries</span><span class="p">(</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">update_prior_to_load</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="p">)</span>
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="unknown-series">Unknown series</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ValueError: Unknown RTDSM series &#39;XYZ&#39;. See macrotrace.sources.rtdsm.RTDSM_CATALOG ...
+</code></pre></div>
+<p><strong>Solution</strong>: Use a supported uppercase mnemonic. Check <code>macrotrace.sources.rtdsm.RTDSM_CATALOG</code> or the <a href="https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/real-time-data-set-full-time-series-history">full series list</a>.</p>
+<h3 id="frequency-not-available">Frequency not available</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ValueError: RTDSM series DIV does not offer M-frequency vintages. Available: Q.
+</code></pre></div>
+<p><strong>Solution</strong>: Request a vintage frequency the series provides, or omit the <code>frequency</code> key to use the default.</p>
 
 
 

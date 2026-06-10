@@ -547,6 +547,8 @@
       
         
       
+        
+      
     
     
     
@@ -637,6 +639,34 @@
     
   
     ONS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../sources/rtdsm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RTDSM
   
 
     
@@ -1481,6 +1511,8 @@
       
         
       
+        
+      
     
     
     
@@ -1596,6 +1628,34 @@
     
   
     ONS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sources/rtdsm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RTDSM
   
 
     
@@ -3135,7 +3195,7 @@ including revision analysis, vintage comparisons, and standard time series plots
 <a id="__codelineno-0-396" name="__codelineno-0-396"></a>            <span class="p">)</span>
 <a id="__codelineno-0-397" name="__codelineno-0-397"></a>
 <a id="__codelineno-0-398" name="__codelineno-0-398"></a>        <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-399" name="__codelineno-0-399"></a>        <span class="k">for</span> <span class="n">vintage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">_vintages_including_current_series</span><span class="p">():</span>
+<a id="__codelineno-0-399" name="__codelineno-0-399"></a>        <span class="k">for</span> <span class="n">vintage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">_vintages_including_current_series</span><span class="p">:</span>
 <a id="__codelineno-0-400" name="__codelineno-0-400"></a>            <span class="n">seasonal_period</span> <span class="o">=</span> <span class="n">vintage</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get_frequency_as_numeric</span><span class="p">()</span>
 <a id="__codelineno-0-401" name="__codelineno-0-401"></a>            <span class="n">minimum_observations</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">seasonal_period</span>
 <a id="__codelineno-0-402" name="__codelineno-0-402"></a>            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vintage</span><span class="o">.</span><span class="n">current_observations</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">minimum_observations</span><span class="p">:</span>
@@ -4684,7 +4744,7 @@ Accepts "additive"/"multiplicative" strings or Darts enum values.</p>
 <a id="__codelineno-0-396" name="__codelineno-0-396"></a>        <span class="p">)</span>
 <a id="__codelineno-0-397" name="__codelineno-0-397"></a>
 <a id="__codelineno-0-398" name="__codelineno-0-398"></a>    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-399" name="__codelineno-0-399"></a>    <span class="k">for</span> <span class="n">vintage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">_vintages_including_current_series</span><span class="p">():</span>
+<a id="__codelineno-0-399" name="__codelineno-0-399"></a>    <span class="k">for</span> <span class="n">vintage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">_vintages_including_current_series</span><span class="p">:</span>
 <a id="__codelineno-0-400" name="__codelineno-0-400"></a>        <span class="n">seasonal_period</span> <span class="o">=</span> <span class="n">vintage</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get_frequency_as_numeric</span><span class="p">()</span>
 <a id="__codelineno-0-401" name="__codelineno-0-401"></a>        <span class="n">minimum_observations</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">seasonal_period</span>
 <a id="__codelineno-0-402" name="__codelineno-0-402"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vintage</span><span class="o">.</span><span class="n">current_observations</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">minimum_observations</span><span class="p">:</span>
