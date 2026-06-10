@@ -23,7 +23,8 @@ known at different publication dates.
 - Store releases locally in SQLite for reproducible, offline-friendly workflows
 - Retrieve series as they were known on a specific date with `as_of(...)`
 - Filter both vintage windows and data windows when loading a series
-- Export to pandas DataFrames and Darts `TimeSeries` objects
+- Recover which release an undated block of data came from with `identify_vintage(...)`
+- Export to pandas DataFrames or Series and Darts `TimeSeries` objects
 - Plot vintages and revision comparisons with built-in Plotly tooling
 
 ## Installation
@@ -103,6 +104,37 @@ routput = MTTimeSeries(
 
 See the [RTDSM source guide](docs/sources/rtdsm.md) for the full list of series
 and details on vintage frequencies.
+
+### Identifying an Unknown Vintage
+
+If you have a block of observations with no release date attached — for
+example, a series lifted from a replication package — `identify_vintage`
+compares it against every stored vintage and reports which release(s) it is
+consistent with:
+
+```python
+from macrotrace import MTTimeSeries
+
+routput = MTTimeSeries(
+    dataset_id="ROUTPUT",
+    source="RTDSM",
+    series_key={"frequency": "Q"},
+)
+
+# `unknown` is a date-indexed pandas Series whose vintage you want to recover
+match = routput.identify_vintage(unknown)
+
+if match.is_ambiguous:
+    print(f"Ambiguous — consistent with {len(match.release_dates)} vintages")
+elif match.matched:
+    print(f"Matches the {match.release_date.date()} vintage")
+else:
+    print("No matching vintage found")
+```
+
+A match is ambiguous when the data is unchanged across consecutive vintages, so
+the values alone cannot pin down a single release; `release_dates` lists every
+consistent vintage in that case.
 
 ## Command-Line Tools
 
