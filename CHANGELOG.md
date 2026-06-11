@@ -3,6 +3,14 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## 0.2.1 — 2026-06-11
+
+- **Docs:** RTDSM is now listed as an available source on the documentation
+  homepage — it had been left under "Coming Soon" when 0.2.0 shipped.
+- **Docs:** The version selector now shows the `latest` label next to the
+  release it points at, and the in-development `dev` build is hidden from
+  the selector (it is still reachable directly at `/dev/`).
+
 ## 0.2.0 — 2026-06-10
 
 - **Sources:** Added the Federal Reserve Bank of Philadelphia's Real-Time

@@ -6,6 +6,7 @@ repo_name: john-ramsey/macrotrace
 extra:
   version:
     provider: mike
+    alias: true
 
 theme:
   name: material

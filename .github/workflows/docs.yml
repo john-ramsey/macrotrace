@@ -37,7 +37,7 @@ jobs:
       - name: Deploy dev docs (push to main)
         if: github.ref == 'refs/heads/main'
         run: |
-          uv run mike deploy --push --update-aliases dev
+          uv run mike deploy --push --update-aliases --prop-set hidden=true dev
           if ! uv run mike list 2>/dev/null | grep -qE '^[0-9]'; then
             uv run mike set-default --push dev
           fi

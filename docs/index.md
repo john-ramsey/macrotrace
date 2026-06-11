@@ -32,9 +32,6 @@ Automated collection from major economic data providers:
 
 - **[FRED](sources/fred.md)** (Federal Reserve Economic Data)
 - **[ONS](sources/ons.md)** (Office for National Statistics)
-
-Coming Soon:
-
 - **[RTDSM](sources/rtdsm.md)** (Real-Time Data Set for Macroeconomists)
 
 ### Revision Tracking
