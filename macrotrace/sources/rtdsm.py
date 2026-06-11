@@ -957,6 +957,8 @@ class RTDSMObservationManager(ObservationManager):
 
 
 class RTDSMUpdateManager(UpdateManager):
+    NATIVE_OBSERVATION_TZ = UTC
+
     def __init__(
         self,
         dataset_id: str,

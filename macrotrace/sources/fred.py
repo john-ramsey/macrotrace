@@ -631,6 +631,8 @@ class FredObservationManager(ObservationManager):
 
 
 class FredUpdateManager(UpdateManager):
+    NATIVE_OBSERVATION_TZ = US_CENTRAL
+
     def __init__(
         self,
         dataset_id: str,

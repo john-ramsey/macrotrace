@@ -3,6 +3,22 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## 0.2.2 — 2026-06-12
+
+- **Vintage matching:** `identify_vintage` now interprets a tz-naive index in
+  the source's native timezone (e.g. midnight US Central for FRED) instead of
+  UTC, so plain dates match FRED vintages.
+- **Vintage matching:** Added a `decimals` argument that rounds both sides
+  before comparison, for matching data published at a fixed precision.
+- **Vintage matching:** `VintageMatch.failure_reason` now reports why nothing
+  matched: timestamps no vintage contains (`"coverage"`) vs value
+  disagreements (`"values"`).
+- **Vintage matching:** Numeric/positional indexes are rejected with a clear
+  error, and `pd.PeriodIndex` is supported.
+- **Vintage matching:** When nothing matches, `VintageMatch.alignment_hint`
+  flags timestamps that would match under a wrong timezone localization, a
+  constant time shift, or a month-end vs month-start convention.
+
 ## 0.2.1 — 2026-06-11
 
 - **Docs:** RTDSM is now listed as an available source on the documentation

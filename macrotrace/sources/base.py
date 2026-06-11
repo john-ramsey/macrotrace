@@ -1,5 +1,5 @@
 from typing import Any, List, Dict, Optional, Tuple
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from math import floor
 from dataclasses import dataclass
 from importlib.metadata import version, PackageNotFoundError
@@ -691,6 +691,12 @@ class ObservationManager:
 
 
 class UpdateManager:
+    # The timezone this source stamps observation timestamps with. Every
+    # subclass must declare its own — MTTimeSeries.identify_vintage uses it to
+    # interpret tz-naive candidate data, so a wrong value silently breaks
+    # matching for that source.
+    NATIVE_OBSERVATION_TZ: tzinfo
+
     def __init__(
         self,
         dataset_id: str,
