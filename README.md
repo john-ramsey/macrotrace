@@ -129,12 +129,8 @@ if match.is_ambiguous:
 elif match.matched:
     print(f"Matches the {match.release_date.date()} vintage")
 else:
-    print("No matching vintage found")
+    print(f"No matching vintage found (failed on: {match.failure_reason})")
 ```
-
-A match is ambiguous when the data is unchanged across consecutive vintages, so
-the values alone cannot pin down a single release; `release_dates` lists every
-consistent vintage in that case.
 
 ## Command-Line Tools
 

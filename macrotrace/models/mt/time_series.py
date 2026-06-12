@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, List, Optional, Dict, Any
+from typing import TYPE_CHECKING, List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, replace
 from dateutil import parser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.frequencies import get_period_alias
 from tabulate import tabulate
 from darts import TimeSeries
 from peewee import JOIN
@@ -32,11 +33,15 @@ logger = logging.getLogger(__name__)
 VALID_SOURCES = ["FRED", "ONS", "RTDSM", "USER"]
 # USER is for user provided data, not from an API
 
+# With fewer observations than this, a constant-shift scan can match a vintage
+# by coincidence, so identify_vintage only reports shift hints above it.
+MIN_OBSERVATIONS_FOR_SHIFT_DETECTION = 5
+
 
 @dataclass
 class VintageMatch:
     """
-    Result of matching an undated data series against the vintages of an MTTimeSeries (see ``MTTimeSeries.identify_vintage``).
+    Result of matching a data series with an unknown release date against the vintages of an MTTimeSeries (see ``MTTimeSeries.identify_vintage``).
 
     A match is ambiguous when the supplied data is consistent with more than one vintage.
     This is common when the data only covers observations that were never revised across a run of consecutive vintages, so the values alone cannot pin down a single release.
@@ -46,12 +51,22 @@ class VintageMatch:
         n_observations: Number of non-null observations from the supplied data that were compared against each vintage.
         rtol: Relative tolerance used for the value comparison.
         atol: Absolute tolerance used for the value comparison.
+        decimals: Number of decimals both sides were rounded to before comparison, or None when no rounding was applied.
+        n_vintages_compared: Total number of vintages the supplied data was compared against.
+        n_vintages_covering: Number of vintages containing every supplied timestamp. When zero, the data failed on coverage rather than on values — see ``failure_reason``.
+        alignment_hint: When nothing matched but a diagnostic pass found a reinterpretation of the timestamps under which the values do match (wrong timezone localization, a constant time shift, or a different day-of-period convention), a human-readable description of it. The hinted reinterpretation never counts as a match — fix the index and re-run.
+        time_shift: The constant shift that, added to the supplied index, makes the values match at least one vintage. Only set when the hint came from the constant-shift detector.
     """
 
     release_dates: List[datetime]
     n_observations: int
     rtol: float
     atol: float
+    decimals: Optional[int] = None
+    n_vintages_compared: int = 0
+    n_vintages_covering: int = 0
+    alignment_hint: Optional[str] = None
+    time_shift: Optional[timedelta] = None
 
     @property
     def matched(self) -> bool:
@@ -62,6 +77,20 @@ class VintageMatch:
     def is_ambiguous(self) -> bool:
         """True if the supplied data matched more than one vintage."""
         return len(self.release_dates) > 1
+
+    @property
+    def failure_reason(self) -> Optional[str]:
+        """
+        Why the supplied data matched no vintage, or None when it matched.
+
+        Returns "coverage" when no vintage contains the supplied timestamps — usually a sign the index dates or timezone are wrong rather than the values — and "values" when at least one vintage contains the timestamps but none matched (the values disagreed, or ``require_exact_coverage`` excluded vintages carrying extra observations).
+
+        Returns:
+            Optional[str]: "coverage", "values", or None when the data matched.
+        """
+        if self.matched:
+            return None
+        return "coverage" if self.n_vintages_covering == 0 else "values"
 
     @property
     def release_date(self) -> Optional[datetime]:
@@ -85,7 +114,20 @@ class VintageMatch:
         """
         compared = f"compared {self.n_observations} observation(s)"
         if not self.matched:
-            return f"VintageMatch(no matching vintage found; {compared})"
+            if self.failure_reason == "coverage":
+                message = (
+                    "VintageMatch(no matching vintage found; no vintage contains "
+                    "the supplied timestamps - check the index dates/timezone"
+                )
+            else:
+                message = (
+                    f"VintageMatch(no matching vintage found; "
+                    f"{self.n_vintages_covering} vintage(s) contain the supplied "
+                    f"timestamps but none matched"
+                )
+            if self.alignment_hint:
+                message += f"; hint: {self.alignment_hint}"
+            return f"{message}; {compared})"
         if self.is_ambiguous:
             dates = ", ".join(d.strftime("%Y-%m-%d") for d in self.release_dates)
             return (
@@ -420,42 +462,59 @@ class MTTimeSeries:
         rtol: float = 1e-05,
         atol: float = 1e-08,
         require_exact_coverage: bool = False,
+        decimals: Optional[int] = None,
     ) -> VintageMatch:
         """
-        Identify which vintage(s) a block of undated data came from.
+        Identify which vintage(s) a block of data with an unknown release date came from.
 
         Replication packages frequently ship a series of observations with no release date attached, only a source.
         This compares the supplied data against every vintage in this MTTimeSeries and reports the release date(s) whose values it is consistent with, so you can recover the vintage you are actually working with.
+        Note that only the release date is treated as unknown: the observations themselves must be dated, with the series index supplying the observation dates.
 
         The supplied data is treated as a (possibly incomplete) window of a vintage: every timestamp in ``series`` must be present in a vintage and its values must agree (within tolerance) for that vintage to match.
         A vintage may carry extra observations the data does not include.
         When the data does not change across consecutive vintages the match is necessarily ambiguous, and all consistent release dates are returned.
 
+        When nothing matches, a diagnostic pass checks whether the values would match under a common timestamp misalignment — the index localized to the wrong timezone, shifted by a constant offset, or stamped with a different day-of-period convention (e.g. month-end instead of month-start) — and reports it via ``VintageMatch.alignment_hint``.
+        A hinted reinterpretation is never counted as a match.
+
         Args:
-            series (pd.Series): The undated data to identify, indexed by date.
-                The index becomes the observation timestamps and the values are compared against each vintage.
-                A tz-naive index is assumed to be UTC, and null values are dropped before matching.
+            series (pd.Series): The data to identify, indexed by observation date.
+                A tz-naive index (dates, date strings, or naive timestamps) is interpreted in the source's native observation timezone — e.g. midnight US Central for FRED — falling back to UTC with a warning when the source has no registered manager.
+                A ``pd.PeriodIndex`` is compared on each period's start timestamp.
+                A numeric index is rejected, because pandas would silently read it as nanosecond offsets from 1970 rather than dates.
+                Null values are dropped before matching.
             rtol (float): Relative tolerance for the value comparison, passed through to ``numpy.isclose``. Defaults to 1e-05.
             atol (float): Absolute tolerance for the value comparison, passed through to ``numpy.isclose``. Defaults to 1e-08.
             require_exact_coverage (bool): If True, a vintage only matches when its timestamps are exactly the timestamps in ``series``, rather than allowing the data to be a sub-window of the vintage. Defaults to False.
+            decimals (Optional[int]): When set, both the supplied data and each vintage's values are rounded to this many decimals before comparison.
+                Use this when the data was published at a fixed precision (e.g. ``decimals=1`` for a series published at one decimal place); it is more faithful than loosening ``atol``, which both accepts values that round apart and rejects values that round together. Defaults to None (no rounding).
 
         Returns:
-            VintageMatch: The matching release date(s) and comparison details. Check ``matched`` to see whether at least one vintage matched.
+            VintageMatch: The matching release date(s) and comparison details.
+                Check ``matched`` to see whether at least one vintage matched, ``failure_reason`` to distinguish data whose timestamps no vintage contains ("coverage") from data that no vintage matched despite containing its timestamps ("values"), and ``alignment_hint`` for a detected timestamp misalignment.
 
         Raises:
             TypeError: If ``series`` is not a pandas Series.
-            ValueError: If ``series`` is empty, has a non-date or duplicated index, or contains no non-null observations.
+            ValueError: If ``series`` is empty, has a numeric, non-date, or duplicated index, or contains no non-null observations.
         """
-        candidate = self._prepare_candidate_series(series)
+        candidate, original_tz = self._prepare_candidate_series(series)
+        candidate_values = candidate.to_numpy(dtype=float)
+        if decimals is not None:
+            candidate_values = np.round(candidate_values, decimals)
 
         matches: List[datetime] = []
+        vintage_frames: List[Tuple[datetime, pd.Series]] = []
+        n_vintages_covering = 0
         for vintage in self._vintages_including_current_series:
             vintage_df = vintage.to_dataframe(mode="default", tz="utc")
             vintage_series = vintage_df.set_index("timestamp")["value"]
+            vintage_frames.append((vintage.release_date, vintage_series))
 
             # Every supplied timestamp must exist in the vintage, otherwise the data cannot be a window of it.
             if not candidate.index.isin(vintage_series.index).all():
                 continue
+            n_vintages_covering += 1
 
             # With exact coverage the vintage must hold exactly the supplied timestamps and nothing more.
             if (
@@ -464,37 +523,64 @@ class MTTimeSeries:
             ):
                 continue
 
-            aligned = vintage_series.reindex(candidate.index)
+            aligned_values = vintage_series.reindex(candidate.index).to_numpy(
+                dtype=float
+            )
+            if decimals is not None:
+                aligned_values = np.round(aligned_values, decimals)
             if np.isclose(
-                candidate.to_numpy(dtype=float),
-                aligned.to_numpy(dtype=float),
+                candidate_values,
+                aligned_values,
                 rtol=rtol,
                 atol=atol,
             ).all():
                 matches.append(vintage.release_date)
+
+        alignment_hint: Optional[str] = None
+        time_shift: Optional[timedelta] = None
+        if not matches:
+            alignment_hint, time_shift = self._diagnose_misalignment(
+                candidate,
+                candidate_values,
+                vintage_frames,
+                rtol,
+                atol,
+                decimals,
+                original_tz,
+            )
+            if alignment_hint is not None:
+                logger.warning("No vintage matched, but %s.", alignment_hint)
 
         return VintageMatch(
             release_dates=sorted(matches),
             n_observations=len(candidate),
             rtol=rtol,
             atol=atol,
+            decimals=decimals,
+            n_vintages_compared=len(vintage_frames),
+            n_vintages_covering=n_vintages_covering,
+            alignment_hint=alignment_hint,
+            time_shift=time_shift,
         )
 
-    def _prepare_candidate_series(self, series: pd.Series) -> pd.Series:
+    def _prepare_candidate_series(
+        self, series: pd.Series
+    ) -> Tuple[pd.Series, Optional[tzinfo]]:
         """
         Validate and normalize a user-supplied data series for vintage matching.
 
         Coerces the values to numeric, drops nulls, and renders the index as a sorted, unique, tz-aware UTC DatetimeIndex so it lines up with the timestamps produced by ``to_dataframe(tz="utc")``.
+        A tz-naive index is interpreted in the source's native observation timezone (see ``_native_observation_timezone``), a PeriodIndex is taken at each period's start, and a numeric index is rejected.
 
         Args:
             series (pd.Series): The user-supplied data indexed by date.
 
         Returns:
-            pd.Series: The cleaned candidate series indexed by UTC timestamps.
+            Tuple[pd.Series, Optional[tzinfo]]: The cleaned candidate series indexed by UTC timestamps, and the timezone the supplied index carried (None when it was tz-naive) so misalignment diagnostics can recover the original wall-clock times.
 
         Raises:
             TypeError: If ``series`` is not a pandas Series.
-            ValueError: If ``series`` is empty, has a non-date or duplicated index, or contains no non-null observations.
+            ValueError: If ``series`` is empty, has a numeric, non-date, or duplicated index, or contains no non-null observations.
         """
         if not isinstance(series, pd.Series):
             raise TypeError(
@@ -507,8 +593,20 @@ class MTTimeSeries:
         if candidate.empty:
             raise ValueError("The series contains no non-null observations to match.")
 
+        index_data = candidate.index
+        # Periods carry real dates; compare on each period's start timestamp.
+        if isinstance(index_data, pd.PeriodIndex):
+            index_data = index_data.to_timestamp()
+
+        # Reject positional/numeric indexes before pd.to_datetime, which would
+        # silently read them as nanosecond offsets from 1970-01-01.
+        if pd.api.types.is_numeric_dtype(index_data):
+            raise ValueError(
+                "The series has a numeric index, not dates. Set the observation dates on the index before matching."
+            )
+
         try:
-            index = pd.to_datetime(candidate.index)
+            index = pd.to_datetime(index_data)
         except (ValueError, TypeError) as exc:
             raise ValueError(
                 "The series must be indexed by dates that pandas can parse."
@@ -517,11 +615,15 @@ class MTTimeSeries:
         if not isinstance(index, pd.DatetimeIndex):
             raise ValueError("The series must be indexed by dates, not scalar values.")
 
+        original_tz = index.tz
         if index.tz is None:
+            native_tz = self._native_observation_timezone()
             logger.warning(
-                "The series index has no timezone information. Assuming UTC."
+                "The series index has no timezone information. Interpreting it in "
+                "the source's native observation timezone (%s).",
+                native_tz,
             )
-            index = index.tz_localize("UTC")
+            index = index.tz_localize(native_tz).tz_convert("UTC")
         else:
             index = index.tz_convert("UTC")
 
@@ -529,7 +631,249 @@ class MTTimeSeries:
             raise ValueError("The series index contains duplicate timestamps.")
 
         candidate.index = index
-        return candidate.sort_index()
+        return candidate.sort_index(), original_tz
+
+    def _diagnose_misalignment(
+        self,
+        candidate: pd.Series,
+        candidate_values: np.ndarray,
+        vintage_frames: List[Tuple[datetime, pd.Series]],
+        rtol: float,
+        atol: float,
+        decimals: Optional[int],
+        original_tz: Optional[tzinfo],
+    ) -> Tuple[Optional[str], Optional[timedelta]]:
+        """
+        Look for a timestamp reinterpretation under which the unmatched data would match.
+
+        Runs the detectors from most to least specific — wrong timezone localization, a constant time shift, then a day-of-period convention mismatch — and stops at the first that fires.
+
+        Args:
+            candidate (pd.Series): The prepared candidate series (UTC index).
+            candidate_values (np.ndarray): The candidate values, already rounded when ``decimals`` is set.
+            vintage_frames (List[Tuple[datetime, pd.Series]]): Each vintage's release date and UTC-indexed values.
+            rtol (float): Relative tolerance for the value comparison.
+            atol (float): Absolute tolerance for the value comparison.
+            decimals (Optional[int]): Decimals both sides are rounded to, or None.
+            original_tz (Optional[tzinfo]): The timezone the supplied index carried, None when it was tz-naive.
+
+        Returns:
+            Tuple[Optional[str], Optional[timedelta]]: A human-readable hint and, for the constant-shift detector only, the shift that aligns the index. Both None when no detector fired.
+        """
+        hint = self._diagnose_wrong_timezone(
+            candidate,
+            candidate_values,
+            vintage_frames,
+            rtol,
+            atol,
+            decimals,
+            original_tz,
+        )
+        if hint is not None:
+            return hint, None
+
+        hint, shift = self._diagnose_constant_shift(
+            candidate, candidate_values, vintage_frames, rtol, atol, decimals
+        )
+        if hint is not None:
+            return hint, shift
+
+        hint = self._diagnose_period_alignment(
+            candidate, candidate_values, vintage_frames, rtol, atol, decimals
+        )
+        return hint, None
+
+    def _diagnose_wrong_timezone(
+        self,
+        candidate: pd.Series,
+        candidate_values: np.ndarray,
+        vintage_frames: List[Tuple[datetime, pd.Series]],
+        rtol: float,
+        atol: float,
+        decimals: Optional[int],
+        original_tz: Optional[tzinfo],
+    ) -> Optional[str]:
+        """
+        Check whether the data matches when its wall-clock times are read in the source's native timezone.
+
+        Only applies to a tz-aware index (a naive one already went through the native timezone), and catches indexes localized to the wrong timezone — including across DST changes, where the error is not a constant offset.
+
+        Returns:
+            Optional[str]: The hint, or None when the detector did not fire.
+        """
+        if original_tz is None:
+            return None
+        native_tz = self._native_observation_timezone()
+        wall_clock = candidate.index.tz_convert(original_tz).tz_localize(None)
+        try:
+            reinterpreted = wall_clock.tz_localize(native_tz).tz_convert("UTC")
+        except Exception:
+            # Wall-clock times that do not exist (or are ambiguous) in the
+            # native timezone around a DST change cannot be reinterpreted.
+            return None
+        if reinterpreted.has_duplicates or reinterpreted.equals(candidate.index):
+            return None
+
+        n_matching = sum(
+            self._candidate_matches_vintage(
+                reinterpreted, vintage_series, candidate_values, rtol, atol, decimals
+            )
+            for _, vintage_series in vintage_frames
+        )
+        if n_matching == 0:
+            return None
+        return (
+            f"the values match {n_matching} vintage(s) when the wall-clock times "
+            f"are reinterpreted in the source's native observation timezone "
+            f"({native_tz}) — the index appears to be localized to the wrong "
+            f"timezone; pass a tz-naive index or localize it to {native_tz}"
+        )
+
+    def _diagnose_constant_shift(
+        self,
+        candidate: pd.Series,
+        candidate_values: np.ndarray,
+        vintage_frames: List[Tuple[datetime, pd.Series]],
+        rtol: float,
+        atol: float,
+        decimals: Optional[int],
+    ) -> Tuple[Optional[str], Optional[timedelta]]:
+        """
+        Check whether the data matches a vintage when its index is shifted by a constant offset.
+
+        Offsets are anchored on aligning the first candidate timestamp to each vintage timestamp and pruned by requiring the middle and last timestamps to land in the vintage too, so only structurally possible shifts are value-checked.
+        Skipped for short candidates, where some shift could match by coincidence (see ``MIN_OBSERVATIONS_FOR_SHIFT_DETECTION``).
+
+        Returns:
+            Tuple[Optional[str], Optional[timedelta]]: The hint and the shift to add to the index, or (None, None) when the detector did not fire.
+        """
+        if len(candidate) < MIN_OBSERVATIONS_FOR_SHIFT_DETECTION:
+            return None, None
+
+        first = candidate.index[0]
+        middle = candidate.index[len(candidate) // 2]
+        last = candidate.index[-1]
+        shifts: Dict[timedelta, int] = {}
+        for _, vintage_series in vintage_frames:
+            offsets = vintage_series.index - first
+            offsets = offsets[(middle + offsets).isin(vintage_series.index)]
+            offsets = offsets[(last + offsets).isin(vintage_series.index)]
+            for offset in offsets:
+                if offset == pd.Timedelta(0):
+                    # A zero shift is the comparison that already failed.
+                    continue
+                if self._candidate_matches_vintage(
+                    candidate.index + offset,
+                    vintage_series,
+                    candidate_values,
+                    rtol,
+                    atol,
+                    decimals,
+                ):
+                    shifts[offset] = shifts.get(offset, 0) + 1
+
+        if not shifts:
+            return None, None
+        best = min(shifts, key=abs)
+        direction = "forward" if best > pd.Timedelta(0) else "back"
+        hint = (
+            f"the values match {shifts[best]} vintage(s) when the index is "
+            f"shifted {direction} by {abs(best)} — the timestamps appear to "
+            f"follow a different convention than the stored observations"
+        )
+        return hint, best
+
+    def _diagnose_period_alignment(
+        self,
+        candidate: pd.Series,
+        candidate_values: np.ndarray,
+        vintage_frames: List[Tuple[datetime, pd.Series]],
+        rtol: float,
+        atol: float,
+        decimals: Optional[int],
+    ) -> Optional[str]:
+        """
+        Check whether the data matches a vintage when both are compared by calendar period.
+
+        Reduces both indexes to periods at the series frequency (daily or coarser), which washes out time-of-day and day-of-period conventions — catching e.g. month-end dates against month-start storage, a mismatch that is not a constant offset.
+
+        Returns:
+            Optional[str]: The hint, or None when the detector did not fire.
+        """
+        try:
+            freq = self._infer_pandas_freq()
+        except (ValueError, TypeError):
+            # Too few observations, or per-row DST offsets that pandas cannot
+            # combine into a single tz-aware index.
+            return None
+        if freq is None:
+            return None
+        period_freq = get_period_alias(freq)
+        if period_freq is None or period_freq[:1].upper() not in {
+            "D",
+            "W",
+            "M",
+            "Q",
+            "A",
+            "Y",
+        }:
+            return None
+
+        candidate_periods = candidate.index.tz_localize(None).to_period(period_freq)
+        if candidate_periods.has_duplicates:
+            return None
+
+        n_matching = 0
+        for _, vintage_series in vintage_frames:
+            vintage_periods = vintage_series.index.tz_localize(None).to_period(
+                period_freq
+            )
+            if vintage_periods.has_duplicates:
+                continue
+            period_series = pd.Series(vintage_series.to_numpy(), index=vintage_periods)
+            if self._candidate_matches_vintage(
+                candidate_periods, period_series, candidate_values, rtol, atol, decimals
+            ):
+                n_matching += 1
+
+        if n_matching == 0:
+            return None
+        return (
+            f"the values match {n_matching} vintage(s) when compared by calendar "
+            f"period ({period_freq}) — the index appears to use a different "
+            f"day-of-period or time convention than the stored observations "
+            f"(e.g. month-end instead of month-start dates)"
+        )
+
+    @staticmethod
+    def _candidate_matches_vintage(
+        index: pd.Index,
+        vintage_series: pd.Series,
+        candidate_values: np.ndarray,
+        rtol: float,
+        atol: float,
+        decimals: Optional[int],
+    ) -> bool:
+        """
+        Whether every index entry exists in the vintage with values agreeing within tolerance.
+
+        Args:
+            index (pd.Index): The (possibly reinterpreted) candidate index.
+            vintage_series (pd.Series): The vintage values, indexed compatibly with ``index``.
+            candidate_values (np.ndarray): The candidate values, already rounded when ``decimals`` is set.
+            rtol (float): Relative tolerance for the value comparison.
+            atol (float): Absolute tolerance for the value comparison.
+            decimals (Optional[int]): Decimals to round the vintage values to, or None.
+
+        Returns:
+            bool: True when the index is fully covered and all values agree.
+        """
+        if not index.isin(vintage_series.index).all():
+            return False
+        aligned = vintage_series.reindex(index).to_numpy(dtype=float)
+        if decimals is not None:
+            aligned = np.round(aligned, decimals)
+        return bool(np.isclose(candidate_values, aligned, rtol=rtol, atol=atol).all())
 
     ### Theoretically if the units change, we should not be able to compare them
     def generate_vintage_matrix(self) -> pd.DataFrame:
@@ -1081,21 +1425,41 @@ class MTTimeSeries:
         """
         return self.vintages + [self]
 
+    @staticmethod
+    def _source_manager_classes() -> Dict[str, type]:
+        """Map source names to their UpdateManager classes, imported lazily to avoid circular imports."""
+        from macrotrace.sources.fred import FredUpdateManager
+        from macrotrace.sources.ons import ONSUpdateManager
+        from macrotrace.sources.rtdsm import RTDSMUpdateManager
+
+        return {
+            "FRED": FredUpdateManager,
+            "ONS": ONSUpdateManager,
+            "RTDSM": RTDSMUpdateManager,
+        }
+
+    def _native_observation_timezone(self) -> tzinfo:
+        """
+        The timezone this series' source stamps observation timestamps with.
+
+        Looked up from the source's update manager class (``NATIVE_OBSERVATION_TZ``).
+        Sources without a registered manager (e.g. user-provided data) fall back to UTC.
+
+        Returns:
+            tzinfo: The source's declared observation timezone, or UTC.
+        """
+        manager_class = self._source_manager_classes().get(self.source)
+        if manager_class is None:
+            return timezone.utc
+        return manager_class.NATIVE_OBSERVATION_TZ
+
     def _get_update_manager(self):
         """Get the appropriate update manager for the data source.
 
         Returns:
             UpdateManager: An instance of the appropriate update manager class.
         """
-        from macrotrace.sources.fred import FredUpdateManager
-        from macrotrace.sources.ons import ONSUpdateManager
-        from macrotrace.sources.rtdsm import RTDSMUpdateManager
-
-        source_managers = {
-            "FRED": FredUpdateManager,
-            "ONS": ONSUpdateManager,
-            "RTDSM": RTDSMUpdateManager,
-        }
+        source_managers = self._source_manager_classes()
 
         assert (
             self.source in source_managers.keys()

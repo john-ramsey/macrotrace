@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 import numpy as np
+import pytz
 from darts import TimeSeries
 
 from macrotrace.models import (
@@ -1368,10 +1369,10 @@ def test_identify_vintage_respects_tolerance(sample_time_series_with_revisions):
     ).matched
 
 
-def test_identify_vintage_naive_index_assumes_utc(
+def test_identify_vintage_naive_index_unknown_source_falls_back_to_utc(
     sample_time_series_with_revisions, caplog
 ):
-    """A tz-naive index is assumed to be UTC (with a warning) and still matches."""
+    """A tz-naive index for a source with no registered manager is interpreted as UTC (with a warning) and still matches."""
     target_release = datetime(2024, 12, 10, tzinfo=timezone.utc)
     vintage = _vintage_with_release_date(
         sample_time_series_with_revisions, target_release
@@ -1381,8 +1382,227 @@ def test_identify_vintage_naive_index_assumes_utc(
 
     result = sample_time_series_with_revisions.identify_vintage(candidate)
 
-    assert "series index has no timezone information. Assuming UTC." in caplog.text
+    assert "series index has no timezone information" in caplog.text
+    assert "(UTC)" in caplog.text
     assert result.release_date == target_release
+
+
+def test_identify_vintage_naive_index_uses_source_native_timezone():
+    """
+    A tz-naive index on a FRED series is interpreted at US Central midnight,
+    matching how FRED stores observations — including across a DST change,
+    where the UTC offset differs between observations.
+    """
+    us_central = pytz.timezone("America/Chicago")
+    release_date = datetime(2024, 3, 12, tzinfo=timezone.utc)
+    # One observation either side of the 2024-03-10 US DST transition.
+    naive_dates = [datetime(2024, 3, 9), datetime(2024, 3, 11)]
+    observations = [
+        MTObservation(
+            timestamp=us_central.localize(date),
+            value=100.0 + i,
+            release_date=release_date,
+        )
+        for i, date in enumerate(naive_dates)
+    ]
+    ts = MTTimeSeries._from_data(
+        dataset_id="TEST",
+        release_date=release_date,
+        current_observations=observations,
+        vintages=[],
+        source="FRED",
+        frequency="D",
+    )
+
+    candidate = pd.Series([100.0, 101.0], index=pd.to_datetime(naive_dates))
+
+    result = ts.identify_vintage(candidate)
+
+    assert result.matched
+    assert result.release_date == release_date
+
+
+def test_identify_vintage_rejects_numeric_index(sample_time_series):
+    """A positional or numeric index would silently become nanosecond offsets from 1970, so it is rejected."""
+    positional = pd.Series([100.0, 101.0, 102.0])
+    with pytest.raises(ValueError, match="numeric index"):
+        sample_time_series.identify_vintage(positional)
+
+    year_indexed = pd.Series([100.0, 101.0], index=[2024, 2025])
+    with pytest.raises(ValueError, match="numeric index"):
+        sample_time_series.identify_vintage(year_indexed)
+
+
+def test_identify_vintage_accepts_period_index(sample_time_series):
+    """A PeriodIndex is compared on each period's start timestamp."""
+    full = sample_time_series.to_series()
+    candidate = pd.Series(
+        full.to_numpy(),
+        index=pd.PeriodIndex(full.index.tz_localize(None), freq="D"),
+    )
+
+    result = sample_time_series.identify_vintage(candidate)
+
+    assert result.matched
+    assert result.release_date == sample_time_series.release_date
+
+
+def test_identify_vintage_decimals_rounds_both_sides(
+    sample_time_series_with_revisions,
+):
+    """Rounding-aware comparison matches data republished at lower precision without loosening atol."""
+    target_release = datetime(2024, 12, 10, tzinfo=timezone.utc)
+    vintage = _vintage_with_release_date(
+        sample_time_series_with_revisions, target_release
+    )
+
+    # Perturbed below the rounding boundary: fails raw, matches at one decimal.
+    candidate = vintage.to_series() + 0.04
+    assert not sample_time_series_with_revisions.identify_vintage(candidate).matched
+
+    result = sample_time_series_with_revisions.identify_vintage(candidate, decimals=1)
+    assert result.release_date == target_release
+    assert result.decimals == 1
+
+    # Perturbed past the rounding boundary: rounds away from the stored values.
+    assert not sample_time_series_with_revisions.identify_vintage(
+        vintage.to_series() + 0.06, decimals=1
+    ).matched
+
+
+def test_identify_vintage_failure_reason(sample_time_series):
+    """failure_reason separates timestamp-coverage failures from value disagreements."""
+    full = sample_time_series.to_series()
+
+    matched = sample_time_series.identify_vintage(full)
+    assert matched.failure_reason is None
+    assert matched.n_vintages_compared == len(
+        sample_time_series._vintages_including_current_series
+    )
+
+    # Same values at timestamps no vintage contains: fails on coverage.
+    shifted = full.copy()
+    shifted.index = shifted.index + pd.Timedelta(hours=6)
+    coverage_failure = sample_time_series.identify_vintage(shifted)
+    assert not coverage_failure.matched
+    assert coverage_failure.failure_reason == "coverage"
+    assert coverage_failure.n_vintages_covering == 0
+    assert "check the index dates/timezone" in repr(coverage_failure)
+
+    # Right timestamps, wrong values: fails on values, and no reinterpretation
+    # of the timestamps can explain values that exist in no vintage.
+    wrong_values = pd.Series(9999.0, index=full.index)
+    value_failure = sample_time_series.identify_vintage(wrong_values)
+    assert not value_failure.matched
+    assert value_failure.failure_reason == "values"
+    assert value_failure.n_vintages_covering > 0
+    assert "no matching vintage found" in repr(value_failure)
+    assert value_failure.alignment_hint is None
+    assert value_failure.time_shift is None
+
+
+def test_identify_vintage_hints_constant_shift(sample_time_series):
+    """An index shifted by a constant offset is flagged with the shift that aligns it."""
+    full = sample_time_series.to_series()
+    shifted = full.copy()
+    shifted.index = shifted.index + pd.Timedelta(hours=6)
+
+    result = sample_time_series.identify_vintage(shifted)
+
+    assert not result.matched
+    assert result.time_shift == pd.Timedelta(hours=-6)
+    assert "shifted back by" in result.alignment_hint
+    assert "hint:" in repr(result)
+
+
+def test_identify_vintage_hints_wrong_timezone(caplog):
+    """
+    A tz-aware index localized to the wrong timezone is flagged via wall-clock
+    reinterpretation — across a DST change, where no constant shift exists.
+    """
+    us_central = pytz.timezone("America/Chicago")
+    release_date = datetime(2024, 3, 12, tzinfo=timezone.utc)
+    naive_dates = [datetime(2024, 3, 8), datetime(2024, 3, 9), datetime(2024, 3, 11)]
+    observations = [
+        MTObservation(
+            timestamp=us_central.localize(date),
+            value=100.0 + i,
+            release_date=release_date,
+        )
+        for i, date in enumerate(naive_dates)
+    ]
+    ts = MTTimeSeries._from_data(
+        dataset_id="TEST",
+        release_date=release_date,
+        current_observations=observations,
+        vintages=[],
+        source="FRED",
+        frequency="D",
+    )
+
+    # The right wall-clock dates, wrongly localized to UTC.
+    candidate = pd.Series(
+        [100.0, 101.0, 102.0], index=pd.to_datetime(naive_dates).tz_localize("UTC")
+    )
+
+    result = ts.identify_vintage(candidate)
+
+    assert not result.matched
+    assert result.time_shift is None
+    assert "localized to the wrong timezone" in result.alignment_hint
+    assert "America/Chicago" in result.alignment_hint
+    assert "localized to the wrong timezone" in caplog.text
+
+
+def test_identify_vintage_hints_period_alignment():
+    """Month-end dates against month-start storage — not a constant offset — are flagged via period comparison."""
+    release_date = datetime(2024, 5, 2, tzinfo=timezone.utc)
+    month_starts = pd.date_range("2024-01-01", periods=4, freq="MS", tz="UTC")
+    observations = [
+        MTObservation(
+            timestamp=ts_.to_pydatetime(), value=100.0 + i, release_date=release_date
+        )
+        for i, ts_ in enumerate(month_starts)
+    ]
+    ts = MTTimeSeries._from_data(
+        dataset_id="TEST",
+        release_date=release_date,
+        current_observations=observations,
+        vintages=[],
+        source="USER",
+        frequency="MS",
+    )
+
+    month_ends = pd.to_datetime(
+        ["2024-01-31", "2024-02-29", "2024-03-31", "2024-04-30"]
+    )
+    candidate = pd.Series([100.0, 101.0, 102.0, 103.0], index=month_ends)
+
+    result = ts.identify_vintage(candidate)
+
+    assert not result.matched
+    assert result.time_shift is None
+    assert "calendar period" in result.alignment_hint
+    assert "month-end" in result.alignment_hint
+
+
+def test_identify_vintage_hint_never_counts_as_match(sample_time_series):
+    """A hinted reinterpretation must not populate release_dates."""
+    full = sample_time_series.to_series()
+    shifted = full.copy()
+    shifted.index = shifted.index + pd.Timedelta(hours=6)
+
+    result = sample_time_series.identify_vintage(shifted)
+
+    assert result.alignment_hint is not None
+    assert result.release_dates == []
+    assert result.release_date is None
+
+
+def test_source_managers_declare_native_observation_timezone():
+    """Every registered source manager declares the timezone it stamps observations with."""
+    for name, manager in MTTimeSeries._source_manager_classes().items():
+        assert getattr(manager, "NATIVE_OBSERVATION_TZ", None) is not None, name
 
 
 def test_identify_vintage_require_exact_coverage(sample_time_series):
