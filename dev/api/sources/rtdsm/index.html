@@ -4420,101 +4420,105 @@ override it to return nothing.</p>
 <span class="normal"><a href="#__codelineno-0-1050">1050</a></span>
 <span class="normal"><a href="#__codelineno-0-1051">1051</a></span>
 <span class="normal"><a href="#__codelineno-0-1052">1052</a></span>
-<span class="normal"><a href="#__codelineno-0-1053">1053</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-959" name="__codelineno-0-959"></a><span class="k">class</span><span class="w"> </span><span class="nc">RTDSMUpdateManager</span><span class="p">(</span><span class="n">UpdateManager</span><span class="p">):</span>
-<a id="__codelineno-0-960" name="__codelineno-0-960"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-<a id="__codelineno-0-961" name="__codelineno-0-961"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-0-962" name="__codelineno-0-962"></a>        <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-0-963" name="__codelineno-0-963"></a>        <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">RTDSM_SOURCE</span><span class="p">,</span>
-<a id="__codelineno-0-964" name="__codelineno-0-964"></a>        <span class="n">series_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-965" name="__codelineno-0-965"></a>        <span class="n">release_start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-966" name="__codelineno-0-966"></a>        <span class="n">release_end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-967" name="__codelineno-0-967"></a>        <span class="n">db_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-968" name="__codelineno-0-968"></a>        <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-970" name="__codelineno-0-970"></a>        <span class="n">excel_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-971" name="__codelineno-0-971"></a>    <span class="p">):</span>
-<a id="__codelineno-0-972" name="__codelineno-0-972"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="sd">        Initialize an RTDSM update manager for a single series.</span>
-<a id="__codelineno-0-974" name="__codelineno-0-974"></a>
-<a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">        Args:</span>
-<a id="__codelineno-0-976" name="__codelineno-0-976"></a><span class="sd">            dataset_id: The series identifier (e.g. &quot;ROUTPUT&quot;); case-insensitive.</span>
-<a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">            source: The source name; defaults to &quot;RTDSM&quot;.</span>
-<a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">            series_key: Optionally ``{&quot;frequency&quot;: &quot;Q&quot;}`` or ``{&quot;frequency&quot;:</span>
-<a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">                &quot;M&quot;}`` to select the vintage frequency. If omitted, defaults to</span>
-<a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">                the series&#39; only vintage frequency, or quarterly when both are</span>
-<a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">                offered.</span>
-<a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">            release_start_date: Optional lower bound on vintage dates to load.</span>
-<a id="__codelineno-0-983" name="__codelineno-0-983"></a><span class="sd">            release_end_date: Optional upper bound on vintage dates to load.</span>
-<a id="__codelineno-0-984" name="__codelineno-0-984"></a><span class="sd">            db_path: Optional path to the SQLite database.</span>
-<a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">            cache_settings: Optional request-cache settings.</span>
-<a id="__codelineno-0-986" name="__codelineno-0-986"></a><span class="sd">            cache_path: Optional path to the request-cache SQLite file.</span>
-<a id="__codelineno-0-987" name="__codelineno-0-987"></a><span class="sd">            excel_dir: Optional directory in which to save the downloaded</span>
-<a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">                spreadsheet. If None, the file is parsed in memory and not kept.</span>
-<a id="__codelineno-0-989" name="__codelineno-0-989"></a>
-<a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">        Raises:</span>
-<a id="__codelineno-0-991" name="__codelineno-0-991"></a><span class="sd">            ValueError: If ``dataset_id`` is not a known RTDSM series, or if the</span>
-<a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">                requested vintage frequency is not offered by that series. The</span>
-<a id="__codelineno-0-993" name="__codelineno-0-993"></a><span class="sd">                catalog is bundled, so an unknown series fails fast here rather</span>
-<a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">                than at fetch time.</span>
-<a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">        &quot;&quot;&quot;</span>
-<a id="__codelineno-0-996" name="__codelineno-0-996"></a>        <span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-<a id="__codelineno-0-997" name="__codelineno-0-997"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span>
-<a id="__codelineno-0-998" name="__codelineno-0-998"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span> <span class="o">=</span> <span class="n">excel_dir</span>
-<a id="__codelineno-0-999" name="__codelineno-0-999"></a>
-<a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>        <span class="n">info</span> <span class="o">=</span> <span class="n">RTDSM_CATALOG</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
-<a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>        <span class="k">if</span> <span class="n">info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>                <span class="sa">f</span><span class="s2">&quot;Unknown RTDSM series </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">!r}</span><span class="s2">. See &quot;</span>
-<a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>                <span class="sa">f</span><span class="s2">&quot;macrotrace.sources.rtdsm.RTDSM_CATALOG for the &quot;</span>
-<a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">)</span><span class="si">}</span><span class="s2"> supported series identifiers.&quot;</span>
-<a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>            <span class="p">)</span>
-<a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>
-<a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>        <span class="n">requested</span> <span class="o">=</span> <span class="n">series_key</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frequency&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">series_key</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span> <span class="o">=</span> <span class="n">_resolve_vintage_freq</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">info</span><span class="p">,</span> <span class="n">requested</span><span class="p">)</span>
-<a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span>
-<a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">_build_filename</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span><span class="p">)</span>
-<a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>        <span class="n">resolved_series_key</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">}</span>
-<a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-<a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>            <span class="sa">f</span><span class="s2">&quot;Initializing RTDSMUpdateManager for </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">}</span><span class="s2"> &quot;</span>
-<a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>            <span class="sa">f</span><span class="s2">&quot;(vintage_freq=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="si">}</span><span class="s2">, file=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">)&quot;</span>
-<a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>        <span class="p">)</span>
-<a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>
-<a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
-<a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>            <span class="n">dataset_id</span><span class="o">=</span><span class="n">dataset_id</span><span class="p">,</span>
-<a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>            <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-<a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>            <span class="n">series_key</span><span class="o">=</span><span class="n">resolved_series_key</span><span class="p">,</span>
-<a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>            <span class="n">release_start_date</span><span class="o">=</span><span class="n">release_start_date</span><span class="p">,</span>
-<a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>            <span class="n">release_end_date</span><span class="o">=</span><span class="n">release_end_date</span><span class="p">,</span>
-<a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>            <span class="n">db_path</span><span class="o">=</span><span class="n">db_path</span><span class="p">,</span>
-<a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>            <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
-<a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>            <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
-<a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>        <span class="p">)</span>
-<a id="__codelineno-0-1028" name="__codelineno-0-1028"></a>
-<a id="__codelineno-0-1029" name="__codelineno-0-1029"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_api_client</span><span class="p">(</span>
-<a id="__codelineno-0-1030" name="__codelineno-0-1030"></a>        <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-0-1031" name="__codelineno-0-1031"></a>        <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-1032" name="__codelineno-0-1032"></a>        <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-1033" name="__codelineno-0-1033"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTDSMAPIClient</span><span class="p">:</span>
-<a id="__codelineno-0-1034" name="__codelineno-0-1034"></a>        <span class="k">return</span> <span class="n">RTDSMAPIClient</span><span class="p">(</span>
-<a id="__codelineno-0-1035" name="__codelineno-0-1035"></a>            <span class="n">dataset_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span>
-<a id="__codelineno-0-1036" name="__codelineno-0-1036"></a>            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
-<a id="__codelineno-0-1037" name="__codelineno-0-1037"></a>            <span class="n">data_freq</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span><span class="p">,</span>
-<a id="__codelineno-0-1038" name="__codelineno-0-1038"></a>            <span class="n">excel_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span><span class="p">,</span>
-<a id="__codelineno-0-1039" name="__codelineno-0-1039"></a>            <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
-<a id="__codelineno-0-1040" name="__codelineno-0-1040"></a>            <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
-<a id="__codelineno-0-1041" name="__codelineno-0-1041"></a>        <span class="p">)</span>
-<a id="__codelineno-0-1042" name="__codelineno-0-1042"></a>
-<a id="__codelineno-0-1043" name="__codelineno-0-1043"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_dataset_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetManager</span><span class="p">:</span>
-<a id="__codelineno-0-1044" name="__codelineno-0-1044"></a>        <span class="k">return</span> <span class="n">RTDSMDatasetManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
-<a id="__codelineno-0-1045" name="__codelineno-0-1045"></a>
-<a id="__codelineno-0-1046" name="__codelineno-0-1046"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_release_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ReleaseManager</span><span class="p">:</span>
-<a id="__codelineno-0-1047" name="__codelineno-0-1047"></a>        <span class="k">return</span> <span class="n">RTDSMReleaseManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
-<a id="__codelineno-0-1048" name="__codelineno-0-1048"></a>
-<a id="__codelineno-0-1049" name="__codelineno-0-1049"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_series_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SeriesManager</span><span class="p">:</span>
-<a id="__codelineno-0-1050" name="__codelineno-0-1050"></a>        <span class="k">return</span> <span class="n">RTDSMSeriesManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
-<a id="__codelineno-0-1051" name="__codelineno-0-1051"></a>
-<a id="__codelineno-0-1052" name="__codelineno-0-1052"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_observation_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ObservationManager</span><span class="p">:</span>
-<a id="__codelineno-0-1053" name="__codelineno-0-1053"></a>        <span class="k">return</span> <span class="n">RTDSMObservationManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1053">1053</a></span>
+<span class="normal"><a href="#__codelineno-0-1054">1054</a></span>
+<span class="normal"><a href="#__codelineno-0-1055">1055</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-959" name="__codelineno-0-959"></a><span class="k">class</span><span class="w"> </span><span class="nc">RTDSMUpdateManager</span><span class="p">(</span><span class="n">UpdateManager</span><span class="p">):</span>
+<a id="__codelineno-0-960" name="__codelineno-0-960"></a>    <span class="n">NATIVE_OBSERVATION_TZ</span> <span class="o">=</span> <span class="n">UTC</span>
+<a id="__codelineno-0-961" name="__codelineno-0-961"></a>
+<a id="__codelineno-0-962" name="__codelineno-0-962"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-0-963" name="__codelineno-0-963"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-964" name="__codelineno-0-964"></a>        <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-965" name="__codelineno-0-965"></a>        <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">RTDSM_SOURCE</span><span class="p">,</span>
+<a id="__codelineno-0-966" name="__codelineno-0-966"></a>        <span class="n">series_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-967" name="__codelineno-0-967"></a>        <span class="n">release_start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-968" name="__codelineno-0-968"></a>        <span class="n">release_end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="n">db_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-970" name="__codelineno-0-970"></a>        <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-971" name="__codelineno-0-971"></a>        <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-972" name="__codelineno-0-972"></a>        <span class="n">excel_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-973" name="__codelineno-0-973"></a>    <span class="p">):</span>
+<a id="__codelineno-0-974" name="__codelineno-0-974"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">        Initialize an RTDSM update manager for a single series.</span>
+<a id="__codelineno-0-976" name="__codelineno-0-976"></a>
+<a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">        Args:</span>
+<a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">            dataset_id: The series identifier (e.g. &quot;ROUTPUT&quot;); case-insensitive.</span>
+<a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">            source: The source name; defaults to &quot;RTDSM&quot;.</span>
+<a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">            series_key: Optionally ``{&quot;frequency&quot;: &quot;Q&quot;}`` or ``{&quot;frequency&quot;:</span>
+<a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">                &quot;M&quot;}`` to select the vintage frequency. If omitted, defaults to</span>
+<a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">                the series&#39; only vintage frequency, or quarterly when both are</span>
+<a id="__codelineno-0-983" name="__codelineno-0-983"></a><span class="sd">                offered.</span>
+<a id="__codelineno-0-984" name="__codelineno-0-984"></a><span class="sd">            release_start_date: Optional lower bound on vintage dates to load.</span>
+<a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">            release_end_date: Optional upper bound on vintage dates to load.</span>
+<a id="__codelineno-0-986" name="__codelineno-0-986"></a><span class="sd">            db_path: Optional path to the SQLite database.</span>
+<a id="__codelineno-0-987" name="__codelineno-0-987"></a><span class="sd">            cache_settings: Optional request-cache settings.</span>
+<a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">            cache_path: Optional path to the request-cache SQLite file.</span>
+<a id="__codelineno-0-989" name="__codelineno-0-989"></a><span class="sd">            excel_dir: Optional directory in which to save the downloaded</span>
+<a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">                spreadsheet. If None, the file is parsed in memory and not kept.</span>
+<a id="__codelineno-0-991" name="__codelineno-0-991"></a>
+<a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">        Raises:</span>
+<a id="__codelineno-0-993" name="__codelineno-0-993"></a><span class="sd">            ValueError: If ``dataset_id`` is not a known RTDSM series, or if the</span>
+<a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">                requested vintage frequency is not offered by that series. The</span>
+<a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">                catalog is bundled, so an unknown series fails fast here rather</span>
+<a id="__codelineno-0-996" name="__codelineno-0-996"></a><span class="sd">                than at fetch time.</span>
+<a id="__codelineno-0-997" name="__codelineno-0-997"></a><span class="sd">        &quot;&quot;&quot;</span>
+<a id="__codelineno-0-998" name="__codelineno-0-998"></a>        <span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+<a id="__codelineno-0-999" name="__codelineno-0-999"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span>
+<a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span> <span class="o">=</span> <span class="n">excel_dir</span>
+<a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>
+<a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>        <span class="n">info</span> <span class="o">=</span> <span class="n">RTDSM_CATALOG</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
+<a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>        <span class="k">if</span> <span class="n">info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>                <span class="sa">f</span><span class="s2">&quot;Unknown RTDSM series </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">!r}</span><span class="s2">. See &quot;</span>
+<a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>                <span class="sa">f</span><span class="s2">&quot;macrotrace.sources.rtdsm.RTDSM_CATALOG for the &quot;</span>
+<a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">)</span><span class="si">}</span><span class="s2"> supported series identifiers.&quot;</span>
+<a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>            <span class="p">)</span>
+<a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>
+<a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>        <span class="n">requested</span> <span class="o">=</span> <span class="n">series_key</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frequency&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">series_key</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span> <span class="o">=</span> <span class="n">_resolve_vintage_freq</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">info</span><span class="p">,</span> <span class="n">requested</span><span class="p">)</span>
+<a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span>
+<a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">_build_filename</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span><span class="p">)</span>
+<a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>        <span class="n">resolved_series_key</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">}</span>
+<a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+<a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>            <span class="sa">f</span><span class="s2">&quot;Initializing RTDSMUpdateManager for </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">}</span><span class="s2"> &quot;</span>
+<a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>            <span class="sa">f</span><span class="s2">&quot;(vintage_freq=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="si">}</span><span class="s2">, file=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">)&quot;</span>
+<a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>        <span class="p">)</span>
+<a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>
+<a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>            <span class="n">dataset_id</span><span class="o">=</span><span class="n">dataset_id</span><span class="p">,</span>
+<a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>            <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
+<a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>            <span class="n">series_key</span><span class="o">=</span><span class="n">resolved_series_key</span><span class="p">,</span>
+<a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>            <span class="n">release_start_date</span><span class="o">=</span><span class="n">release_start_date</span><span class="p">,</span>
+<a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>            <span class="n">release_end_date</span><span class="o">=</span><span class="n">release_end_date</span><span class="p">,</span>
+<a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>            <span class="n">db_path</span><span class="o">=</span><span class="n">db_path</span><span class="p">,</span>
+<a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>            <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
+<a id="__codelineno-0-1028" name="__codelineno-0-1028"></a>            <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
+<a id="__codelineno-0-1029" name="__codelineno-0-1029"></a>        <span class="p">)</span>
+<a id="__codelineno-0-1030" name="__codelineno-0-1030"></a>
+<a id="__codelineno-0-1031" name="__codelineno-0-1031"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_api_client</span><span class="p">(</span>
+<a id="__codelineno-0-1032" name="__codelineno-0-1032"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-1033" name="__codelineno-0-1033"></a>        <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-1034" name="__codelineno-0-1034"></a>        <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-1035" name="__codelineno-0-1035"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RTDSMAPIClient</span><span class="p">:</span>
+<a id="__codelineno-0-1036" name="__codelineno-0-1036"></a>        <span class="k">return</span> <span class="n">RTDSMAPIClient</span><span class="p">(</span>
+<a id="__codelineno-0-1037" name="__codelineno-0-1037"></a>            <span class="n">dataset_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span>
+<a id="__codelineno-0-1038" name="__codelineno-0-1038"></a>            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+<a id="__codelineno-0-1039" name="__codelineno-0-1039"></a>            <span class="n">data_freq</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span><span class="p">,</span>
+<a id="__codelineno-0-1040" name="__codelineno-0-1040"></a>            <span class="n">excel_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span><span class="p">,</span>
+<a id="__codelineno-0-1041" name="__codelineno-0-1041"></a>            <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
+<a id="__codelineno-0-1042" name="__codelineno-0-1042"></a>            <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
+<a id="__codelineno-0-1043" name="__codelineno-0-1043"></a>        <span class="p">)</span>
+<a id="__codelineno-0-1044" name="__codelineno-0-1044"></a>
+<a id="__codelineno-0-1045" name="__codelineno-0-1045"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_dataset_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetManager</span><span class="p">:</span>
+<a id="__codelineno-0-1046" name="__codelineno-0-1046"></a>        <span class="k">return</span> <span class="n">RTDSMDatasetManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
+<a id="__codelineno-0-1047" name="__codelineno-0-1047"></a>
+<a id="__codelineno-0-1048" name="__codelineno-0-1048"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_release_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ReleaseManager</span><span class="p">:</span>
+<a id="__codelineno-0-1049" name="__codelineno-0-1049"></a>        <span class="k">return</span> <span class="n">RTDSMReleaseManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
+<a id="__codelineno-0-1050" name="__codelineno-0-1050"></a>
+<a id="__codelineno-0-1051" name="__codelineno-0-1051"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_series_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SeriesManager</span><span class="p">:</span>
+<a id="__codelineno-0-1052" name="__codelineno-0-1052"></a>        <span class="k">return</span> <span class="n">RTDSMSeriesManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
+<a id="__codelineno-0-1053" name="__codelineno-0-1053"></a>
+<a id="__codelineno-0-1054" name="__codelineno-0-1054"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_create_observation_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ObservationManager</span><span class="p">:</span>
+<a id="__codelineno-0-1055" name="__codelineno-0-1055"></a>        <span class="k">return</span> <span class="n">RTDSMObservationManager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_client</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -4736,9 +4740,7 @@ than at fetch time.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>macrotrace/sources/rtdsm.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-960"> 960</a></span>
-<span class="normal"><a href="#__codelineno-0-961"> 961</a></span>
-<span class="normal"><a href="#__codelineno-0-962"> 962</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-962"> 962</a></span>
 <span class="normal"><a href="#__codelineno-0-963"> 963</a></span>
 <span class="normal"><a href="#__codelineno-0-964"> 964</a></span>
 <span class="normal"><a href="#__codelineno-0-965"> 965</a></span>
@@ -4803,74 +4805,76 @@ than at fetch time.</p>
 <span class="normal"><a href="#__codelineno-0-1024">1024</a></span>
 <span class="normal"><a href="#__codelineno-0-1025">1025</a></span>
 <span class="normal"><a href="#__codelineno-0-1026">1026</a></span>
-<span class="normal"><a href="#__codelineno-0-1027">1027</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-960" name="__codelineno-0-960"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-<a id="__codelineno-0-961" name="__codelineno-0-961"></a>    <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-0-962" name="__codelineno-0-962"></a>    <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-0-963" name="__codelineno-0-963"></a>    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">RTDSM_SOURCE</span><span class="p">,</span>
-<a id="__codelineno-0-964" name="__codelineno-0-964"></a>    <span class="n">series_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-965" name="__codelineno-0-965"></a>    <span class="n">release_start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-966" name="__codelineno-0-966"></a>    <span class="n">release_end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-967" name="__codelineno-0-967"></a>    <span class="n">db_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-968" name="__codelineno-0-968"></a>    <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-969" name="__codelineno-0-969"></a>    <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-970" name="__codelineno-0-970"></a>    <span class="n">excel_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-971" name="__codelineno-0-971"></a><span class="p">):</span>
-<a id="__codelineno-0-972" name="__codelineno-0-972"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="sd">    Initialize an RTDSM update manager for a single series.</span>
-<a id="__codelineno-0-974" name="__codelineno-0-974"></a>
-<a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-976" name="__codelineno-0-976"></a><span class="sd">        dataset_id: The series identifier (e.g. &quot;ROUTPUT&quot;); case-insensitive.</span>
-<a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">        source: The source name; defaults to &quot;RTDSM&quot;.</span>
-<a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">        series_key: Optionally ``{&quot;frequency&quot;: &quot;Q&quot;}`` or ``{&quot;frequency&quot;:</span>
-<a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">            &quot;M&quot;}`` to select the vintage frequency. If omitted, defaults to</span>
-<a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">            the series&#39; only vintage frequency, or quarterly when both are</span>
-<a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">            offered.</span>
-<a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">        release_start_date: Optional lower bound on vintage dates to load.</span>
-<a id="__codelineno-0-983" name="__codelineno-0-983"></a><span class="sd">        release_end_date: Optional upper bound on vintage dates to load.</span>
-<a id="__codelineno-0-984" name="__codelineno-0-984"></a><span class="sd">        db_path: Optional path to the SQLite database.</span>
-<a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">        cache_settings: Optional request-cache settings.</span>
-<a id="__codelineno-0-986" name="__codelineno-0-986"></a><span class="sd">        cache_path: Optional path to the request-cache SQLite file.</span>
-<a id="__codelineno-0-987" name="__codelineno-0-987"></a><span class="sd">        excel_dir: Optional directory in which to save the downloaded</span>
-<a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">            spreadsheet. If None, the file is parsed in memory and not kept.</span>
-<a id="__codelineno-0-989" name="__codelineno-0-989"></a>
-<a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-991" name="__codelineno-0-991"></a><span class="sd">        ValueError: If ``dataset_id`` is not a known RTDSM series, or if the</span>
-<a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">            requested vintage frequency is not offered by that series. The</span>
-<a id="__codelineno-0-993" name="__codelineno-0-993"></a><span class="sd">            catalog is bundled, so an unknown series fails fast here rather</span>
-<a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">            than at fetch time.</span>
-<a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-996" name="__codelineno-0-996"></a>    <span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-<a id="__codelineno-0-997" name="__codelineno-0-997"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span>
-<a id="__codelineno-0-998" name="__codelineno-0-998"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span> <span class="o">=</span> <span class="n">excel_dir</span>
-<a id="__codelineno-0-999" name="__codelineno-0-999"></a>
-<a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>    <span class="n">info</span> <span class="o">=</span> <span class="n">RTDSM_CATALOG</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
-<a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>    <span class="k">if</span> <span class="n">info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>            <span class="sa">f</span><span class="s2">&quot;Unknown RTDSM series </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">!r}</span><span class="s2">. See &quot;</span>
-<a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>            <span class="sa">f</span><span class="s2">&quot;macrotrace.sources.rtdsm.RTDSM_CATALOG for the &quot;</span>
-<a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">)</span><span class="si">}</span><span class="s2"> supported series identifiers.&quot;</span>
-<a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>        <span class="p">)</span>
-<a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>
-<a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>    <span class="n">requested</span> <span class="o">=</span> <span class="n">series_key</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frequency&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">series_key</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span> <span class="o">=</span> <span class="n">_resolve_vintage_freq</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">info</span><span class="p">,</span> <span class="n">requested</span><span class="p">)</span>
-<a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span>
-<a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">_build_filename</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span><span class="p">)</span>
-<a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>    <span class="n">resolved_series_key</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">}</span>
-<a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-<a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>        <span class="sa">f</span><span class="s2">&quot;Initializing RTDSMUpdateManager for </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">}</span><span class="s2"> &quot;</span>
-<a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>        <span class="sa">f</span><span class="s2">&quot;(vintage_freq=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="si">}</span><span class="s2">, file=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">)&quot;</span>
-<a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>    <span class="p">)</span>
-<a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>
-<a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
-<a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>        <span class="n">dataset_id</span><span class="o">=</span><span class="n">dataset_id</span><span class="p">,</span>
-<a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>        <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-<a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>        <span class="n">series_key</span><span class="o">=</span><span class="n">resolved_series_key</span><span class="p">,</span>
-<a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>        <span class="n">release_start_date</span><span class="o">=</span><span class="n">release_start_date</span><span class="p">,</span>
-<a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>        <span class="n">release_end_date</span><span class="o">=</span><span class="n">release_end_date</span><span class="p">,</span>
-<a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>        <span class="n">db_path</span><span class="o">=</span><span class="n">db_path</span><span class="p">,</span>
-<a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>        <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
-<a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>        <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
-<a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>    <span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1027">1027</a></span>
+<span class="normal"><a href="#__codelineno-0-1028">1028</a></span>
+<span class="normal"><a href="#__codelineno-0-1029">1029</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-962" name="__codelineno-0-962"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-0-963" name="__codelineno-0-963"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-964" name="__codelineno-0-964"></a>    <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-965" name="__codelineno-0-965"></a>    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">RTDSM_SOURCE</span><span class="p">,</span>
+<a id="__codelineno-0-966" name="__codelineno-0-966"></a>    <span class="n">series_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-967" name="__codelineno-0-967"></a>    <span class="n">release_start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-968" name="__codelineno-0-968"></a>    <span class="n">release_end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-969" name="__codelineno-0-969"></a>    <span class="n">db_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-970" name="__codelineno-0-970"></a>    <span class="n">cache_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-971" name="__codelineno-0-971"></a>    <span class="n">cache_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-972" name="__codelineno-0-972"></a>    <span class="n">excel_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="p">):</span>
+<a id="__codelineno-0-974" name="__codelineno-0-974"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-975" name="__codelineno-0-975"></a><span class="sd">    Initialize an RTDSM update manager for a single series.</span>
+<a id="__codelineno-0-976" name="__codelineno-0-976"></a>
+<a id="__codelineno-0-977" name="__codelineno-0-977"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-978" name="__codelineno-0-978"></a><span class="sd">        dataset_id: The series identifier (e.g. &quot;ROUTPUT&quot;); case-insensitive.</span>
+<a id="__codelineno-0-979" name="__codelineno-0-979"></a><span class="sd">        source: The source name; defaults to &quot;RTDSM&quot;.</span>
+<a id="__codelineno-0-980" name="__codelineno-0-980"></a><span class="sd">        series_key: Optionally ``{&quot;frequency&quot;: &quot;Q&quot;}`` or ``{&quot;frequency&quot;:</span>
+<a id="__codelineno-0-981" name="__codelineno-0-981"></a><span class="sd">            &quot;M&quot;}`` to select the vintage frequency. If omitted, defaults to</span>
+<a id="__codelineno-0-982" name="__codelineno-0-982"></a><span class="sd">            the series&#39; only vintage frequency, or quarterly when both are</span>
+<a id="__codelineno-0-983" name="__codelineno-0-983"></a><span class="sd">            offered.</span>
+<a id="__codelineno-0-984" name="__codelineno-0-984"></a><span class="sd">        release_start_date: Optional lower bound on vintage dates to load.</span>
+<a id="__codelineno-0-985" name="__codelineno-0-985"></a><span class="sd">        release_end_date: Optional upper bound on vintage dates to load.</span>
+<a id="__codelineno-0-986" name="__codelineno-0-986"></a><span class="sd">        db_path: Optional path to the SQLite database.</span>
+<a id="__codelineno-0-987" name="__codelineno-0-987"></a><span class="sd">        cache_settings: Optional request-cache settings.</span>
+<a id="__codelineno-0-988" name="__codelineno-0-988"></a><span class="sd">        cache_path: Optional path to the request-cache SQLite file.</span>
+<a id="__codelineno-0-989" name="__codelineno-0-989"></a><span class="sd">        excel_dir: Optional directory in which to save the downloaded</span>
+<a id="__codelineno-0-990" name="__codelineno-0-990"></a><span class="sd">            spreadsheet. If None, the file is parsed in memory and not kept.</span>
+<a id="__codelineno-0-991" name="__codelineno-0-991"></a>
+<a id="__codelineno-0-992" name="__codelineno-0-992"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-993" name="__codelineno-0-993"></a><span class="sd">        ValueError: If ``dataset_id`` is not a known RTDSM series, or if the</span>
+<a id="__codelineno-0-994" name="__codelineno-0-994"></a><span class="sd">            requested vintage frequency is not offered by that series. The</span>
+<a id="__codelineno-0-995" name="__codelineno-0-995"></a><span class="sd">            catalog is bundled, so an unknown series fails fast here rather</span>
+<a id="__codelineno-0-996" name="__codelineno-0-996"></a><span class="sd">            than at fetch time.</span>
+<a id="__codelineno-0-997" name="__codelineno-0-997"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-998" name="__codelineno-0-998"></a>    <span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+<a id="__codelineno-0-999" name="__codelineno-0-999"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">dataset_id</span> <span class="o">=</span> <span class="n">dataset_id</span>
+<a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">excel_dir</span> <span class="o">=</span> <span class="n">excel_dir</span>
+<a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>
+<a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>    <span class="n">info</span> <span class="o">=</span> <span class="n">RTDSM_CATALOG</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
+<a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>    <span class="k">if</span> <span class="n">info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>            <span class="sa">f</span><span class="s2">&quot;Unknown RTDSM series </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">!r}</span><span class="s2">. See &quot;</span>
+<a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>            <span class="sa">f</span><span class="s2">&quot;macrotrace.sources.rtdsm.RTDSM_CATALOG for the &quot;</span>
+<a id="__codelineno-0-1007" name="__codelineno-0-1007"></a>            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">RTDSM_CATALOG</span><span class="p">)</span><span class="si">}</span><span class="s2"> supported series identifiers.&quot;</span>
+<a id="__codelineno-0-1008" name="__codelineno-0-1008"></a>        <span class="p">)</span>
+<a id="__codelineno-0-1009" name="__codelineno-0-1009"></a>
+<a id="__codelineno-0-1010" name="__codelineno-0-1010"></a>    <span class="n">requested</span> <span class="o">=</span> <span class="n">series_key</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frequency&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">series_key</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-1011" name="__codelineno-0-1011"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span> <span class="o">=</span> <span class="n">_resolve_vintage_freq</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">info</span><span class="p">,</span> <span class="n">requested</span><span class="p">)</span>
+<a id="__codelineno-0-1012" name="__codelineno-0-1012"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">data_freq</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span>
+<a id="__codelineno-0-1013" name="__codelineno-0-1013"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">_build_filename</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">data_freq</span><span class="p">)</span>
+<a id="__codelineno-0-1014" name="__codelineno-0-1014"></a>    <span class="n">resolved_series_key</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="p">}</span>
+<a id="__codelineno-0-1015" name="__codelineno-0-1015"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+<a id="__codelineno-0-1016" name="__codelineno-0-1016"></a>        <span class="sa">f</span><span class="s2">&quot;Initializing RTDSMUpdateManager for </span><span class="si">{</span><span class="n">dataset_id</span><span class="si">}</span><span class="s2"> &quot;</span>
+<a id="__codelineno-0-1017" name="__codelineno-0-1017"></a>        <span class="sa">f</span><span class="s2">&quot;(vintage_freq=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">vintage_freq</span><span class="si">}</span><span class="s2">, file=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">)&quot;</span>
+<a id="__codelineno-0-1018" name="__codelineno-0-1018"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1019" name="__codelineno-0-1019"></a>
+<a id="__codelineno-0-1020" name="__codelineno-0-1020"></a>    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-0-1021" name="__codelineno-0-1021"></a>        <span class="n">dataset_id</span><span class="o">=</span><span class="n">dataset_id</span><span class="p">,</span>
+<a id="__codelineno-0-1022" name="__codelineno-0-1022"></a>        <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
+<a id="__codelineno-0-1023" name="__codelineno-0-1023"></a>        <span class="n">series_key</span><span class="o">=</span><span class="n">resolved_series_key</span><span class="p">,</span>
+<a id="__codelineno-0-1024" name="__codelineno-0-1024"></a>        <span class="n">release_start_date</span><span class="o">=</span><span class="n">release_start_date</span><span class="p">,</span>
+<a id="__codelineno-0-1025" name="__codelineno-0-1025"></a>        <span class="n">release_end_date</span><span class="o">=</span><span class="n">release_end_date</span><span class="p">,</span>
+<a id="__codelineno-0-1026" name="__codelineno-0-1026"></a>        <span class="n">db_path</span><span class="o">=</span><span class="n">db_path</span><span class="p">,</span>
+<a id="__codelineno-0-1027" name="__codelineno-0-1027"></a>        <span class="n">cache_settings</span><span class="o">=</span><span class="n">cache_settings</span><span class="p">,</span>
+<a id="__codelineno-0-1028" name="__codelineno-0-1028"></a>        <span class="n">cache_path</span><span class="o">=</span><span class="n">cache_path</span><span class="p">,</span>
+<a id="__codelineno-0-1029" name="__codelineno-0-1029"></a>    <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
