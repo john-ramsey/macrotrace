@@ -1783,6 +1783,7 @@
 </code></pre></div>
 <h2 id="recover-the-vintage-available-on-a-historical-date">Recover the Vintage Available on a Historical Date</h2>
 <p>The <code>as_of()</code> method returns the most recent vintage available on or before the date you choose.</p>
+<p>Note that naive input is read on the source's own clock. A date string (<code>"YYYY-MM-DD"</code> only), a <code>datetime.date</code>, or a naive datetime resolves in the source's native timezone. This means a calendar date lands at the source's midnight, exactly where sources stamp their releases, and a release on that day is included. For example, FRED stamps releases at midnight US Central (05:00/06:00 UTC) and <code>as_of("2018-03-16")</code> on a FRED series includes its 2018-03-16 release. Pass a timezone-aware datetime to compare against an exact instant instead.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">realtime_payems</span> <span class="o">=</span> <span class="n">payems</span><span class="o">.</span><span class="n">as_of</span><span class="p">(</span>
