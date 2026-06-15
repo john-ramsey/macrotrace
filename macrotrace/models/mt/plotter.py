@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
-from datetime import datetime
+from datetime import date, datetime
 import warnings
 
 import numpy as np
@@ -147,9 +147,8 @@ class MTTimeSeriesPlotter:
             go.Figure: Plotly figure showing observation revisions over time.
         """
         if isinstance(observation_datetime, str):
-            observation_datetime = self.ts._parse_string_date(
-                observation_datetime
-            )  # Returns UTC timezone
+            # Resolves to the source's midnight on that day
+            observation_datetime = self.ts._parse_string_date(observation_datetime)
         elif not isinstance(observation_datetime, datetime):
             raise ValueError(
                 f"Invalid observation datetime type: {type(observation_datetime)}. Must be a string or a datetime."
@@ -588,7 +587,7 @@ class MTTimeSeriesPlotter:
 
     def timeseries_comparison(
         self,
-        vintage_dates: List[str | datetime],
+        vintage_dates: List[str | datetime | date],
         chart_type: str = "bar",
         mode: str = "default",
         y_axis_zero_indexed: bool = False,
@@ -597,7 +596,7 @@ class MTTimeSeriesPlotter:
         Plots a comparison of time series vintages.
 
         Args:
-            vintage_dates (List[str | datetime]): List of vintage identifiers. Ex. '2025-11-01'
+            vintage_dates (List[str | datetime | date]): List of vintage identifiers, resolved via ``as_of``. Ex. '2025-11-01'
             chart_type (str, optional): Type of chart to plot. Either "bar" or "line". Defaults to "bar".
             mode (str, optional): The mode for which the dataframe is provided. Supports "default", "first_difference", and "pct_change". Defaults to "default".
             y_axis_zero_indexed (bool, optional): Sets base of the y-axis to zero.
@@ -610,14 +609,6 @@ class MTTimeSeriesPlotter:
                 f"Invalid mode: {mode}. Supported modes are 'default', 'first_difference', and 'pct_change'."
             )
 
-        for vintage_date in vintage_dates:
-            if (not isinstance(vintage_date, str)) and (
-                not isinstance(vintage_date, datetime)
-            ):
-                raise TypeError(
-                    "Vintage dates must be provided as strings or datetime objects."
-                )
-
         fig = go.Figure()
         all_values = []
         hoverinfo = "x+y+name"
@@ -626,7 +617,7 @@ class MTTimeSeriesPlotter:
             df = self.ts.as_of(vintage_date).to_dataframe(mode=mode)
             vintage_date = (
                 vintage_date.strftime("%Y-%m-%d")
-                if isinstance(vintage_date, datetime)
+                if isinstance(vintage_date, date)
                 else vintage_date
             )
             if chart_type == "bar":

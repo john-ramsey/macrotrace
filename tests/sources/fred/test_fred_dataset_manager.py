@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
-from dateutil.parser import ParserError
 
 
 from macrotrace.models.db import Dataset, DatasetDimension
@@ -44,22 +43,19 @@ def test_parse_fred_date_with_date_string(api_client):
     assert fred_date == US_CENTRAL.localize(datetime(2023, 12, 31))
 
 
-def test_parse_fred_date_with_datetime_string(api_client):
-    """Test the _parse_date method with a datetime string."""
+@pytest.mark.parametrize(
+    "fred_date_str",
+    [
+        "2023-12-31 14:30:00",
+        "2023-12-31T15:00:00-06:00",
+        "10000-01-01",
+    ],
+)
+def test_parse_fred_date_rejects_non_date_strings(api_client, fred_date_str):
+    """The FRED API only sends YYYY-MM-DD; anything else fails loudly."""
     dm = FredDatasetManager(api_client=api_client)
-    fred_date_str = "2023-12-31 14:30:00"
-    fred_date = dm._parse_date(fred_date_str)
-    assert fred_date == US_CENTRAL.localize(datetime(2023, 12, 31, 14, 30, 0))
-
-
-def test_parse_fred_date_with_timezone_string(api_client):
-    """Test the _parse_date method with a date string containing timezone info."""
-    dm = FredDatasetManager(api_client=api_client)
-    fred_date_str = "2023-12-31T15:00:00-06:00"
-    fred_date = dm._parse_date(fred_date_str)
-    # Localize to US_CENTRAL timezone since we are converting
-    expected_datetime = US_CENTRAL.localize(datetime(2023, 12, 31, 15, 0, 0))
-    assert fred_date == expected_datetime
+    with pytest.raises(ValueError):
+        dm._parse_date(fred_date_str)
 
 
 def test_parse_fred_date_with_ongoing_date(api_client):
@@ -70,29 +66,11 @@ def test_parse_fred_date_with_ongoing_date(api_client):
     assert fred_date is None
 
 
-def test_parse_fred_date_with_non_overflow_error(api_client):
-    """Test the _parse_date method with a non-overflow error string. This should raise a ValueError."""
+def test_parse_fred_date_with_invalid_string(api_client):
+    """Test the _parse_date method with an unparseable string."""
     dm = FredDatasetManager(api_client=api_client)
     fred_date_str = "invalid-date-string"
     with pytest.raises(ValueError):
-        dm._parse_date(fred_date_str)
-
-
-def test_parse_date_catches_overflow_error(api_client):
-    """Test that _parse_date catches OverflowError and returns none."""
-    dm = FredDatasetManager(api_client=api_client)
-    fred_date_str = "10000-01-01"  # This will cause an OverflowError in datetime
-
-    fred_date = dm._parse_date(fred_date_str)
-    assert fred_date is None
-
-
-def test_parse_date_raises_unexpected_error(api_client):
-    """Test that _parse_date raises unexpected errors (parsing for example)."""
-    dm = FredDatasetManager(api_client=api_client)
-    fred_date_str = "not-a-date"  # This will cause a ParserError in datetime
-
-    with pytest.raises(ParserError):
         dm._parse_date(fred_date_str)
 
 

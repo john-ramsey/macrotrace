@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime
 import pytz
 
 from macrotrace.sources import rtdsm as R
@@ -139,14 +139,6 @@ def test_resolve_vintage_freq_unavailable_raises():
 def test_resolve_vintage_freq_bad_value_raises():
     with pytest.raises(ValueError, match="must be 'Q' or 'M'"):
         R._resolve_vintage_freq("RCON", R.RTDSM_CATALOG["RCON"], "weekly")
-
-
-def test_ensure_utc():
-    naive = datetime(2020, 1, 1)
-    assert R._ensure_utc(naive) == datetime(2020, 1, 1, tzinfo=UTC)
-    aware = datetime(2020, 1, 1, tzinfo=timezone(timezone.utc.utcoffset(None)))
-    assert R._ensure_utc(aware).tzinfo == UTC
-    assert R._ensure_utc(None) is None
 
 
 def test_parse_workbook_quarterly():

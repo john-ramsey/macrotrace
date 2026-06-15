@@ -30,31 +30,6 @@ def test_initialization(api_client):
     assert rm.api_client == api_client
 
 
-def test_ensure_us_central_no_tz(api_client):
-    """Test that _ensure_us_central adds US Central timezone to naive datetime."""
-    rm = FredReleaseManager(api_client=api_client)
-    naive_dt = datetime(2020, 1, 1, 12, 0, 0)
-    converted_dt = rm._ensure_us_central(naive_dt)
-    assert converted_dt == US_CENTRAL.localize(naive_dt)
-    # Verify it landed on real CST (-6h), not pytz LMT (-5h50m36s).
-    assert converted_dt.utcoffset() == timedelta(hours=-6)
-
-
-def test_ensure_us_central_with_tz(api_client):
-    """Test that _ensure_us_central converts aware datetime to US Central."""
-    rm = FredReleaseManager(api_client=api_client)
-    aware_dt = datetime(2020, 1, 1, 12, 0, 0, tzinfo=pytz.utc)
-    converted_dt = rm._ensure_us_central(aware_dt)
-    expected_dt = aware_dt.astimezone(US_CENTRAL)
-    assert converted_dt == expected_dt
-
-
-def test_ensure_us_central_none(api_client):
-    """Test that _ensure_us_central returns None when given None."""
-    rm = FredReleaseManager(api_client=api_client)
-    assert rm._ensure_us_central(None) is None
-
-
 def test_get_new_releases_all_new(api_client, empty_state):
     """Test that all releases are new when none exist in the database."""
     state = empty_state

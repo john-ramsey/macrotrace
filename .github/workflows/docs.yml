@@ -49,7 +49,7 @@ jobs:
           if [[ "$VERSION" =~ (rc|a|b|dev|alpha|beta) ]]; then
             uv run mike deploy --push "$VERSION"
           else
-            uv run mike deploy --push --update-aliases "$VERSION" latest
+            uv run mike deploy --push --update-aliases --alias-type copy "$VERSION" latest
             uv run mike set-default --push latest
           fi
 

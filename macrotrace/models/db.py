@@ -40,6 +40,11 @@ def is_valid_dateoffset(value: str) -> bool:
         return False
 
 
+def _utc_now() -> datetime.datetime:
+    """Callable default so each row stamps its own creation time, not the import time."""
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
 class StrictDateTimeField(DateTimeField):
     """DateTimeField that enforces timezone-aware datetime objects in ISO 8601 format."""
 
@@ -122,9 +127,7 @@ class DatasetDimension(DataBaseModel):
     # Validity period for this dimension definition, null valid_to means currently valid
     valid_from = StrictDateTimeField()
     valid_to = StrictDateTimeField(null=True)
-    created_at = StrictDateTimeField(
-        default=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
+    created_at = StrictDateTimeField(default=_utc_now)
 
     class Meta:
         constraints = [
@@ -152,9 +155,7 @@ class Release(DataBaseModel):
     )
     release_date = StrictDateTimeField()
     additional_metadata = JSONField(null=True)
-    created_at = StrictDateTimeField(
-        default=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
+    created_at = StrictDateTimeField(default=_utc_now)
 
     class Meta:
         constraints = [SQL("UNIQUE(dataset_id, release_date)")]
@@ -182,9 +183,7 @@ class ReleaseDimension(DataBaseModel):
         backref="release_dimensions",
         on_delete="CASCADE",
     )
-    created_at = StrictDateTimeField(
-        default=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
+    created_at = StrictDateTimeField(default=_utc_now)
 
     class Meta:
         constraints = [SQL("UNIQUE(release_id, dimension_id)")]
@@ -199,9 +198,7 @@ class ReleaseDimension(DataBaseModel):
 class Series(DataBaseModel):
     dataset = ForeignKeyField(Dataset, backref="series", on_delete="CASCADE")
     series_key = JSONField()
-    created_at = StrictDateTimeField(
-        default=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
+    created_at = StrictDateTimeField(default=_utc_now)
 
     def __repr__(self):
         return (
@@ -249,9 +246,7 @@ class Observation(DataBaseModel):
 
     observation_timestamp = StrictDateTimeField()
     value = FloatField(null=True)  # null if the observation is missing
-    created_at = StrictDateTimeField(
-        default=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
+    created_at = StrictDateTimeField(default=_utc_now)
 
     class Meta:
         constraints = [SQL("UNIQUE(release_id, observation_timestamp)")]

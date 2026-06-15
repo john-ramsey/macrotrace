@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, replace
-from dateutil import parser
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,7 @@ from tabulate import tabulate
 from darts import TimeSeries
 from peewee import JOIN
 
+from macrotrace._time import ensure_timezone
 from macrotrace.models.db import (
     Dataset,
     DatasetDimension,
@@ -141,7 +141,6 @@ class VintageMatch:
 
 
 class MTTimeSeries:
-
     def __init__(
         self,
         dataset_id: str,
@@ -150,12 +149,12 @@ class MTTimeSeries:
         # vintage_start_date and vintage_end_date define the vintage window returned
         # by this MTTimeSeries instance. Update managers may still backfill outside
         # the requested window so future loads can move backward without data loss.
-        vintage_start_date: Optional[str | datetime] = None,
-        vintage_end_date: Optional[str | datetime] = None,
+        vintage_start_date: Optional[str | datetime | date] = None,
+        vintage_end_date: Optional[str | datetime | date] = None,
         # Recall we want to only filter the observations returned, not the data fetched.
         # Filtering data before writing to the db may cause incomplete vintage chains.
-        data_start_date: Optional[str | datetime] = None,
-        data_end_date: Optional[str | datetime] = None,
+        data_start_date: Optional[str | datetime | date] = None,
+        data_end_date: Optional[str | datetime | date] = None,
         update_prior_to_load: bool = True,
         db_path: Optional[str] = None,
         cache_path: Optional[str] = None,
@@ -166,10 +165,19 @@ class MTTimeSeries:
             dataset_id: Dataset identifier (e.g., "GDP", "UNRATE")
             source: Data source ("FRED", "ONS", etc.)
             series_key: Dictionary of dimension filters for multi-dimensional datasets
-            vintage_start_date: Start date for vintage window
-            vintage_end_date: End date for vintage window
-            data_start_date: Filter observations after this date
-            data_end_date: Filter observations before this date
+
+            All four date windows are inclusive and accept a ``YYYY-MM-DD``
+            string, a ``datetime.date``, or a datetime. Naive input is read on
+            the source's own clock. A date becomes the source's midnight on that day,
+            matching how sources stamp their releases and observations — so e.g.
+            ``vintage_end_date="2018-03-16"`` includes FRED's 2018-03-16
+            release even though it is stored at midnight US Central.
+            Pass an aware datetime to bound by an exact instant instead.
+
+            vintage_start_date: Only load vintages released on or after this date
+            vintage_end_date: Only load vintages released on or before this date
+            data_start_date: Only keep observations stamped on or after this date
+            data_end_date: Only keep observations stamped on or before this date
             update_prior_to_load: Whether to fetch new data from API before loading
             db_path: Path to the SQLite database. Resolution: this argument,
                 then the ``MACROTRACE_DB`` env var, then ``MacroTrace.db`` in
@@ -414,36 +422,39 @@ class MTTimeSeries:
             self._analysis = MTTimeSeriesAnalysis(self)
         return self._analysis
 
-    def as_of(self, target_date: datetime | str) -> Optional["MTTimeSeries"]:
+    def as_of(self, target_date: datetime | str | date) -> Optional["MTTimeSeries"]:
         """
         Returns the most recent vintage as of a specific date.
 
+        A date string (``"YYYY-MM-DD"``), a ``datetime.date``, or a naive datetime
+        is read on the source's own clock, so a calendar date lands at the source's midnight
+        and matches how the source stamps its releases. A timezone-aware datetime is compared as the exact instant it denotes.
+
         Raises:
-            ValueError: If no vintages are available.
+            ValueError: If the target is a string not in ``YYYY-MM-DD`` form,
+                lies on a future calendar day in the source's timezone, or no
+                vintage exists on or before it.
 
         Args:
-            target_date (datetime | str): The target date to check against.
-                If a string is provided, it will be parsed into a datetime object.
-                If no timezone is provided, it is assumed to be in UTC.
+            target_date (datetime | str | date): The target date. Pass a
+                ``YYYY-MM-DD`` string or a date for a calendar day, or a
+                datetime for a specific moment.
 
         Returns:
-            MTTimeSeries: The latest available vintage on or before the target_date.
+            MTTimeSeries: The latest available vintage as of the target_date.
         """
-        if type(target_date) is str:
-            target_date = self._parse_string_date(target_date)
-        elif isinstance(target_date, datetime):
-            if target_date.tzinfo is None:
-                logger.warning(
-                    "Datetime object provided without timezone info. Assuming UTC."
-                )
-                target_date = target_date.replace(tzinfo=timezone.utc)
-        elif not isinstance(target_date, datetime):
+        if not isinstance(target_date, (str, date)):
             raise ValueError(
-                f"Invalid target date type: {type(target_date)}. Must be a string or a datetime."
+                f"Invalid target date type: {type(target_date)}. Must be a string, a date, or a datetime."
             )
+        target_date = self._clean_date(target_date)
 
-        # ensure the target date is not in the future
-        if target_date > datetime.now().astimezone():
+        # Guard against targets on a future calendar day. Comparing dates on
+        # the source's clock (not instants) keeps "as of today" valid even
+        # while the source's calendar day still lags UTC's.
+        native_tz = self._native_observation_timezone()
+        now_local = datetime.now(timezone.utc).astimezone(native_tz)
+        if target_date.astimezone(native_tz).date() > now_local.date():
             raise ValueError("The target date cannot be in the future.")
 
         eligible_vintages = self._find_eligible_vintages(target_date)
@@ -1255,28 +1266,30 @@ class MTTimeSeries:
 
     def _parse_string_date(self, dt: str) -> datetime:
         """
-        Parses a string date into a datetime object.
+        Parses a ``YYYY-MM-DD`` string to the source's midnight on that day.
+
+        Date strings denote calendar days, never instants, so only the
+        unambiguous ISO 8601 calendar form is accepted. Please pass a datetime
+        object when a specific time matters. The day is anchored at midnight
+        in the source's native timezone, which is how every source stamps its
+        release dates and observation timestamps.
 
         Args:
-            dt (str): The datetime string to parse.
+            dt (str): The date string to parse, in ``YYYY-MM-DD`` form.
 
         Returns:
-            datetime: The parsed datetime object.
+            datetime: The source-local midnight starting that calendar day.
+
+        Raises:
+            ValueError: If the string is not in ``YYYY-MM-DD`` form.
         """
         try:
-            parsed_dt = parser.parse(dt)
-            if parsed_dt.tzinfo is None:
-                # If no timezone is provided, assume UTC
-                logger.warning(
-                    f"Assuming datetime string {dt} is UTC timezone. Please provide a datetime object with timezone info if this is not the case."
-                )
-                parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
-            return parsed_dt
-
+            parsed_dt = datetime.strptime(dt, "%Y-%m-%d")
         except ValueError:
             raise ValueError(
-                f"Invalid date string format {dt}. Please provide a datetime or a date string which can be parsed by dateutil.parser."
+                f"Invalid date string format {dt}. Date strings must be 'YYYY-MM-DD'; pass a datetime object to target a specific time."
             )
+        return ensure_timezone(parsed_dt, self._native_observation_timezone())
 
     def _set_source(self, source: str):
         """Validate and set the data source."""
@@ -1287,23 +1300,29 @@ class MTTimeSeries:
             )
         self.source = source_upper
 
-    def _clean_date(self, dt: str | datetime) -> datetime:
-        """Convert a date string to a datetime object. Returns None if dt is None."""
+    def _clean_date(self, dt: str | datetime | date) -> Optional[datetime]:
+        """
+        Normalize a date input to an aware datetime on the source's clock.
+        """
         if dt is None:
             return None
         if isinstance(dt, str):
-            dt = parser.isoparse(dt)
-        elif isinstance(dt, datetime):
-            pass  # No need to parse, already a datetime object
-        else:
-            raise TypeError(f"Invalid date format: {dt}")  # Not a string or datetime
-
-        if dt.tzinfo is None:
-            logger.warning(
-                "Datetime object provided without timezone info. Assuming UTC."
+            return self._parse_string_date(dt)
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                logger.warning(
+                    "Datetime object provided without timezone info. "
+                    "Interpreting it in the source's native timezone (%s).",
+                    self._native_observation_timezone(),
+                )
+                dt = ensure_timezone(dt, self._native_observation_timezone())
+            return dt
+        if isinstance(dt, date):
+            return ensure_timezone(
+                datetime(dt.year, dt.month, dt.day),
+                self._native_observation_timezone(),
             )
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        raise TypeError(f"Invalid date format: {dt}")  # Not a string or datetime
 
     def _get_series_dimension_from_key(self, state) -> List[DatasetDimension]:
         """

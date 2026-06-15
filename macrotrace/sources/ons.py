@@ -9,6 +9,7 @@ from tenacity import (
     retry_if_exception,
 )
 
+from macrotrace._time import ensure_timezone
 from macrotrace.models.db import (
     Dataset,
     DatasetDimension,
@@ -750,8 +751,10 @@ class ONSReleaseManager(ReleaseManager):
                 skipped_count += 1
                 continue
             else:
-                release_date = datetime.fromisoformat(release_date_str).replace(
-                    tzinfo=UTC
+                # ensure_timezone converts (rather than overwrites) the offset
+                # should the API ever return a non-UTC time.
+                release_date = ensure_timezone(
+                    datetime.fromisoformat(release_date_str), UTC
                 )
 
             if self._skip_release(release_date, state, current_release_dates):

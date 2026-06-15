@@ -53,6 +53,7 @@ from tenacity import (
 )
 from tqdm import tqdm
 
+from macrotrace._time import ensure_timezone
 from macrotrace.models.db import (
     DatasetDimension,
     Observation,
@@ -611,20 +612,6 @@ def _parse_workbook(
     return ParsedVintageFile(vintages=vintages, cells=cells)
 
 
-def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Return the datetime as a timezone-aware UTC value, or None.
-
-    RTDSM release dates are stored in UTC, so any caller-supplied window bound
-    must also be timezone-aware to compare correctly.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
-
-
 class RTDSMAPIClient(APIClient):
     """
     Downloads and parses a single RTDSM spreadsheet.
@@ -822,8 +809,8 @@ class RTDSMReleaseManager(ReleaseManager):
         Returns:
             List[Release]: The new releases.
         """
-        state.release_start_date = _ensure_utc(state.release_start_date)
-        state.release_end_date = _ensure_utc(state.release_end_date)
+        state.release_start_date = ensure_timezone(state.release_start_date, UTC)
+        state.release_end_date = ensure_timezone(state.release_end_date, UTC)
 
         parsed = self.api_client.get_parsed_file()
         current_release_dates = self._get_current_releases_in_db(state.dataset.id)

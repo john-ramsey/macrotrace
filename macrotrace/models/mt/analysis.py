@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+import datetime
 import logging
 
 import numpy as np
@@ -510,7 +511,6 @@ class MTTimeSeriesAnalysis:
         darts_ts = self.ts.to_darts_timeseries()
 
         if len(darts_ts) >= (min_train_size + 1):
-
             for i in range(min_train_size, len(darts_ts)):
                 train = darts_ts[:i]
                 test = darts_ts[i : i + 1]
@@ -629,7 +629,10 @@ class MTTimeSeriesAnalysis:
         )
 
     def vintage_comparison(
-        self, vintage_dates: List[str], mode: str = "growth", strategy: str = "all"
+        self,
+        vintage_dates: List[str | datetime.datetime | datetime.date],
+        mode: str = "growth",
+        strategy: str = "all",
     ) -> "VintageComparison":
         """
         Compare vintages across summary measures describing revisions of a
@@ -677,7 +680,9 @@ class MTTimeSeriesAnalysis:
                   period-over-period change in the level changes sign between vintages.
 
         Args:
-            vintage_dates (List[str]): A list of vintage identifiers to compare.
+            vintage_dates (List[str | datetime | date]): The vintages to
+                compare, each resolved through ``as_of()`` — a ``YYYY-MM-DD``
+                string or date for a calendar day, or a datetime for an exact instant.
             mode (str): The mode of comparison ("growth" or "levels").
             strategy (str): The strategy for comparison ("sequential", "final", or "all").
 
