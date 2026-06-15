@@ -1,5 +1,6 @@
 import os
 import pytest
+from datetime import date
 from unittest.mock import MagicMock, patch
 import pandas as pd
 
@@ -29,16 +30,33 @@ def test_clean_date_none(empty_timeseries):
     assert dt is None
 
 
-def test_clean_date_str_ntz(empty_timeseries):
-    """Test that MTTimeSeries._clean_date cleans a date string with no timezone correctly and sets UTC"""
+def test_clean_date_str(empty_timeseries):
+    """A YYYY-MM-DD string becomes the source's midnight on that day.
+    The test source has no registered manager, so its native timezone is UTC."""
     dt = empty_timeseries._clean_date("2023-05-15")
     assert dt == datetime(2023, 5, 15, tzinfo=UTC)
 
 
-def test_clean_date_str_tz(empty_timeseries):
-    """Test that MTTimeSeries._clean_date cleans a date string with timezone correctly"""
-    dt = empty_timeseries._clean_date("2023-05-15T12:00:00+08:00")
-    assert dt == datetime(2023, 5, 15, 12, 0, 0, tzinfo=timezone(timedelta(hours=8)))
+def test_clean_date_str_fred_source_localizes_to_us_central(empty_timeseries):
+    """For a FRED series, a date string lands at midnight US Central — the
+    same convention FRED's release dates and observations are stored with."""
+    empty_timeseries.source = "FRED"
+    dt = empty_timeseries._clean_date("2018-03-16")
+    assert dt == pytz.timezone("America/Chicago").localize(datetime(2018, 3, 16))
+
+
+def test_clean_date_date_object(empty_timeseries):
+    """A datetime.date becomes the source's midnight on that day"""
+    dt = empty_timeseries._clean_date(date(2023, 5, 15))
+    assert dt == datetime(2023, 5, 15, tzinfo=UTC)
+
+
+def test_clean_date_str_with_time_rejected(empty_timeseries):
+    """Date strings denote calendar days only; times require a datetime object"""
+    with pytest.raises(ValueError, match="Date strings must be 'YYYY-MM-DD'"):
+        empty_timeseries._clean_date("2023-05-15T12:00:00")
+    with pytest.raises(ValueError, match="Date strings must be 'YYYY-MM-DD'"):
+        empty_timeseries._clean_date("2023-05-15T12:00:00+08:00")
 
 
 def test_clean_date_datetime_with_tz(empty_timeseries):
@@ -49,7 +67,8 @@ def test_clean_date_datetime_with_tz(empty_timeseries):
 
 
 def test_clean_date_datetime_no_tz(empty_timeseries):
-    """Test that MTTimeSeries._clean_date cleans a datetime object with no timezone correctly and sets UTC"""
+    """A naive datetime is interpreted in the source's native timezone (UTC
+    for the unregistered test source)"""
     dt = datetime(2023, 5, 15)
     cleaned_dt = empty_timeseries._clean_date(dt)
     assert cleaned_dt.tzinfo == timezone.utc

@@ -3,6 +3,22 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## 0.3.0 — 2026-06-15
+
+- **Breaking:** Naive date inputs (`as_of`, the vintage/data windows,
+  `vintage_comparison`) are read on the source's clock instead of UTC.
+  This fixes same-day vintages being silently skipped for FRED,
+  which stamps releases at midnight US Central:
+  `as_of("2018-03-16")` now returns the 2018-03-16 vintage, and a
+  `data_end_date` on a period boundary no longer drops the final observation.
+  Timezone-aware datetimes still compare as exact instants.
+- **Breaking:** Date strings must be `YYYY-MM-DD`; `datetime.date` objects
+  are now accepted. Free-text parsing is gone (along with the `dateutil`
+  dependency), so ambiguous formats like `"03/04/2018"` are rejected instead
+  of guessed.
+- **Fixed:** `created_at` columns stamped each row with the process start
+  time instead of its actual creation time.
+
 ## 0.2.2 — 2026-06-12
 
 - **Vintage matching:** `identify_vintage` now interprets a tz-naive index in

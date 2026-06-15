@@ -1,14 +1,13 @@
 import os
 from datetime import datetime
 from typing import Any, List, Optional, Dict
-from dateutil import parser
 
 import numpy as np
 import pytz
 
 from tqdm import tqdm
 
-
+from macrotrace._time import ensure_timezone
 from macrotrace.sources.base import (
     APIClient,
     UpdateManager,
@@ -115,36 +114,15 @@ class FredDatasetManager(DatasetManager):
 
     def _parse_date(self, date_str: str) -> Optional[datetime]:
         """
-        Parse the FRED date string from FRED API into a datetime object.
-        FRED uses "9999-12-31" to indicate an ongoing dimension, which we convert to None.
-
-        Args:
-            date_str (str): The date string from FRED API.
-        Returns:
-            Optional[datetime]: A datetime object representing valid_to, or None if ongoing.
+        Parse a FRED API date (always YYYY-MM-DD) to midnight US Central.
+        FRED uses "9999-12-31" to indicate an ongoing dimension -> None.
         """
-        try:
-            date = parser.parse(date_str)
-            if date.tzinfo is None:
-                # Use pytz.localize() rather than .replace(tzinfo=...) — the latter
-                # binds pytz's first historical entry for America/Chicago (LMT,
-                # -05:50:36) instead of CST/CDT, which silently drifts dates by
-                # ~9 minutes and causes downstream day-rollback bugs after
-                # tz_convert + normalize. See tests/sources/fred/test_fred_tz_handling.py.
-                date = US_CENTRAL.localize(date)
-            if date.year == 9999 and date.month == 12 and date.day == 31:
-                logger.debug("Parsed ongoing dimension date (9999-12-31) as None")
-                return None
-            return date
-        except (ValueError, OverflowError) as e:
-            # FRED uses 9999-12-31 to indicate "ongoing" check for parsing errors "date value out of range"
-            if "out of range" in str(e):
-                logger.debug(
-                    f"Date {date_str} out of range, treating as ongoing (None)"
-                )
-                return None
-            else:
-                raise e
+        if date_str == "9999-12-31":
+            logger.debug("Parsed ongoing dimension date (9999-12-31) as None")
+            return None
+        return ensure_timezone(
+            datetime.strptime(date_str, FRED_DATE_FORMAT), US_CENTRAL
+        )
 
     def _convert_frequency(self, fred_frequency: str) -> Optional[str]:
         """
@@ -287,24 +265,6 @@ class FredReleaseManager(ReleaseManager):
     def __init__(self, api_client: FredAPIClient):
         super().__init__(api_client)
 
-    def _ensure_us_central(self, dt: datetime) -> datetime:
-        """
-        Ensure the given datetime is in US Central timezone.
-
-        Args:
-            dt (datetime): The datetime to check.
-        Returns:
-            datetime: The datetime in US Central timezone.
-        """
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            # Assume US Central if no timezone info. Use pytz.localize() so the
-            # CST/CDT offset is selected per-date instead of LMT (-05:50:36).
-            return US_CENTRAL.localize(dt)
-        # Otherwise, convert to US Central
-        return dt.astimezone(US_CENTRAL)
-
     def fetch_new_releases(
         self,
         state: UpdateState,
@@ -322,8 +282,8 @@ class FredReleaseManager(ReleaseManager):
             List[Release]: A list of new Release objects to be created.
         """
         # Convert release_start_date and release_end_date to US Central timezone if they are not None and have no timezone info
-        state.release_start_date = self._ensure_us_central(state.release_start_date)
-        state.release_end_date = self._ensure_us_central(state.release_end_date)
+        state.release_start_date = ensure_timezone(state.release_start_date, US_CENTRAL)
+        state.release_end_date = ensure_timezone(state.release_end_date, US_CENTRAL)
 
         # Get the appropriate API start date (handles backfilling)
         api_start_date = self._get_api_start_date(

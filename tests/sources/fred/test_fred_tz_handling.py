@@ -1,23 +1,3 @@
-"""
-Regression tests for FRED timezone handling.
-
-Background
-----------
-Earlier versions of ``macrotrace/sources/fred.py`` localised parsed FRED dates
-with the broken pytz idiom ``datetime(...).replace(tzinfo=US_CENTRAL)``. When a
-``pytz`` zone is bound via ``tzinfo=`` directly (instead of via
-``US_CENTRAL.localize(...)``) pytz applies its *first* historical entry for the
-zone, which for ``America/Chicago`` is Local Mean Time (LMT) at -05:50:36 — not
-CST/CDT. The resulting datetimes were ~9 minutes off true CST midnight, which
-silently rolled observation timestamps to the previous day after a downstream
-``tz_convert`` + ``normalize`` (the symptom that surfaced in the
-``6_1_revision_dynamics`` notebook, where December PAYEMS observations
-appeared as ``2021-11-30 -06:00`` instead of ``2021-12-01 -06:00``).
-
-These tests pin the offset of every FRED-localised datetime to a real Chicago
-offset (-05:00 CDT or -06:00 CST) so the LMT regression cannot return.
-"""
-
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -25,7 +5,6 @@ import pandas as pd
 import pytest
 
 from macrotrace.models.db import Dataset, Release, Series
-from macrotrace.sources.base import UpdateState
 from macrotrace.sources.fred import (
     FredDatasetManager,
     FredObservationManager,
@@ -78,25 +57,6 @@ def test_parse_date_uses_real_chicago_offset(api_client, date_str, expected_offs
     parsed = dm._parse_date(date_str)
     _assert_real_chicago_offset(parsed)
     assert parsed.utcoffset() == expected_offset
-
-
-@pytest.mark.parametrize(
-    "naive_dt,expected_offset",
-    [
-        (datetime(2020, 1, 1), CST_OFFSET),
-        (datetime(2020, 7, 1), CDT_OFFSET),
-        (datetime(2020, 3, 8, 3, 0, 0), CDT_OFFSET),  # just after DST start
-        (datetime(2020, 11, 1, 1, 30, 0), CST_OFFSET),  # 2020 DST ends Nov 1
-    ],
-)
-def test_ensure_us_central_uses_real_chicago_offset(
-    api_client, naive_dt, expected_offset
-):
-    """_ensure_us_central must localise naive datetimes to real CST/CDT, not LMT."""
-    rm = FredReleaseManager(api_client=api_client)
-    converted = rm._ensure_us_central(naive_dt)
-    _assert_real_chicago_offset(converted)
-    assert converted.utcoffset() == expected_offset
 
 
 def test_fetch_new_releases_localises_release_dates_correctly(api_client, empty_state):

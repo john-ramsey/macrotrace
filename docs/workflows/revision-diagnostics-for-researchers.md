@@ -73,7 +73,7 @@ The `ratio` compares the standard deviation of revisions with the standard devia
 `vintage_comparison()` summarizes how a chosen set of vintages differ from one another across several revision statistics. Unlike the diagnostics above, which sweep the full vintage chain, here you pick the vintages you care about and decide how to pair them up.
 
 The main arguments for the method are:
-- `vintage_dates`: the vintages you want to compare. Each requested date is resolved through `as_of()` to the nearest release at or before that date, so you can hand it any calendar date. If two requested dates resolve to the same release, the duplicates collapse and a warning is logged.
+- `vintage_dates`: the vintages you want to compare. Each requested date is resolved through `as_of()` to the nearest release at or before that date, so you can hand it any `YYYY-MM-DD` calendar date (read on the source's clock) or datetime.
 - `mode` (default `"growth"`): in `"growth"` mode each vintage is converted to within-vintage period-over-period growth rates before comparison, so metrics describe revisions to the *growth rate*. In `"levels"` mode the raw level values are compared and metrics describe revisions to the *level*.
 - `strategy`: `"sequential"` walks pairwise (v1→v2, v2→v3), `"final"` compares each earlier vintage against the most recent vintage in the request, and `"all"` compares every pair.
 

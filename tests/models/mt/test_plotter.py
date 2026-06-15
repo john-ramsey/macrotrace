@@ -250,10 +250,8 @@ def test_plot_timeseries_comparison_invalid_mode(sample_time_series):
 
 
 def test_plot_timeseries_comparison_invalid_vintage_date_type(sample_time_series):
-    with pytest.raises(
-        TypeError,
-        match="Vintage dates must be provided as strings or datetime objects.",
-    ):
+    # Validation happens in as_of, which each vintage date resolves through.
+    with pytest.raises(ValueError, match="Invalid target date type"):
         sample_time_series.plot.timeseries_comparison(
             [v.release_date for v in sample_time_series.vintages] + [12345],
         )

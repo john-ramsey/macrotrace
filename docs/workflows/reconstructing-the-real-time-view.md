@@ -19,6 +19,8 @@ payems = MTTimeSeries(
 
 The `as_of()` method returns the most recent vintage available on or before the date you choose.
 
+Note that naive input is read on the source's own clock. A date string (`"YYYY-MM-DD"` only), a `datetime.date`, or a naive datetime resolves in the source's native timezone. This means a calendar date lands at the source's midnight, exactly where sources stamp their releases, and a release on that day is included. For example, FRED stamps releases at midnight US Central (05:00/06:00 UTC) and `as_of("2018-03-16")` on a FRED series includes its 2018-03-16 release. Pass a timezone-aware datetime to compare against an exact instant instead.
+
 ```python
 from datetime import datetime, timezone
 

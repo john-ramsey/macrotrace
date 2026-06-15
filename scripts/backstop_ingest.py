@@ -21,7 +21,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
-from dateutil import parser as date_parser
 
 from macrotrace import MTTimeSeries
 from macrotrace._paths import resolve_db_path
@@ -181,13 +180,6 @@ def _reset_local_db() -> None:
     LOGGER.info("Reset local DB %s (dropped %d tables)", db_path, len(tables))
 
 
-def _parse_date_to_utc(date_value: str) -> datetime:
-    dt = date_parser.isoparse(date_value)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
 def _is_placeholder_value(value: object) -> bool:
     if isinstance(value, str):
         return value.startswith("__REPLACE_")
@@ -204,7 +196,7 @@ def _ingest_one(
     source: str,
     source_name: str,
     dataset_id: str,
-    vintage_start_date: datetime,
+    vintage_start_date: str,
     series_key: Optional[Dict[str, str]] = None,
 ) -> IngestResult:
     start = time.perf_counter()
@@ -256,7 +248,7 @@ def _build_cli() -> argparse.ArgumentParser:
     parser.add_argument(
         "--vintage-start-date",
         default="2019-01-01",
-        help="ISO-8601 release start date to limit ingest volume (default: 2019-01-01).",
+        help="Release start date (YYYY-MM-DD) to limit ingest volume (default: 2019-01-01).",
     )
     parser.add_argument(
         "--max-failures",
@@ -293,7 +285,9 @@ def main() -> int:
         LOGGER.error("FRED_API_KEY is not set; FRED ingestion cannot run.")
         return 2
 
-    vintage_start_date = _parse_date_to_utc(args.vintage_start_date)
+    # Passed through to MTTimeSeries, which reads the calendar date on each
+    # source's own clock.
+    vintage_start_date = args.vintage_start_date
     results: List[IngestResult] = []
 
     LOGGER.info("Starting FRED ingest (%d sources)", len(FRED_SOURCES))

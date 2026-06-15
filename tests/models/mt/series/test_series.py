@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import numpy as np
 import pytz
@@ -443,11 +443,10 @@ def test_as_of(sample_time_series):
 
 
 def test_as_of_date_parsing(sample_time_series):
-    # converting to a string and back to simulate us cutting off the time component
-    as_of_date_str = (datetime(2024, 12, 10)).strftime("%Y-%m-%d")
-    as_of_date = datetime.strptime(as_of_date_str, "%Y-%m-%d").replace(
-        tzinfo=timezone.utc
-    )
+    # A date string resolves to the source's midnight on that day. The test
+    # source has no registered manager, so its native timezone is UTC.
+    as_of_date_str = "2024-12-10"
+    as_of_date = datetime(2024, 12, 10, tzinfo=timezone.utc)
 
     # Create a mock that returns a valid vintage
     mock_find_eligible_vintages = MagicMock(
@@ -460,18 +459,28 @@ def test_as_of_date_parsing(sample_time_series):
     # Call as_of with the string
     as_of_ts = sample_time_series.as_of(as_of_date_str)
 
-    # Verify the mock was called with the correctly parsed datetime
+    # Verify the mock was called with the source-local midnight
     mock_find_eligible_vintages.assert_called_once()
     called_date = mock_find_eligible_vintages.call_args[0][0]
     assert isinstance(called_date, datetime)
     assert called_date == as_of_date
 
 
+def test_as_of_string_with_time_rejected(sample_time_series):
+    # Date strings denote calendar days only; a time component must be passed
+    # as a datetime object instead.
+    with pytest.raises(
+        ValueError,
+        match="Date strings must be 'YYYY-MM-DD'",
+    ):
+        sample_time_series.as_of("2024-12-10 06:30")
+
+
 def test_as_of_date_parsing_invalid(sample_time_series):
     as_of_date_str = "ABCDEF"  # Invalid date format for this test
     with pytest.raises(
         ValueError,
-        match=f"Invalid date string format {as_of_date_str}. Please provide a datetime or a date string which can be parsed by dateutil.parser.",
+        match=f"Invalid date string format {as_of_date_str}. Date strings must be 'YYYY-MM-DD'; pass a datetime object to target a specific time.",
     ):
         sample_time_series.as_of(as_of_date_str)
 
@@ -480,7 +489,7 @@ def test_as_of_not_a_datetime(sample_time_series):
     as_of_date_invalid = 12345  # Invalid type for this test
     with pytest.raises(
         ValueError,
-        match=f"Invalid target date type: {type(as_of_date_invalid)}. Must be a string or a datetime.",
+        match=f"Invalid target date type: {type(as_of_date_invalid)}. Must be a string, a date, or a datetime.",
     ):
         sample_time_series.as_of(as_of_date_invalid)
 
@@ -509,9 +518,121 @@ def test_as_of_datetime_no_tz(sample_time_series, caplog):
     as_of_date = datetime(2024, 12, 10)  # No timezone info
     sample_time_series.as_of(as_of_date)
 
+    assert "Datetime object provided without timezone info." in caplog.text
+    assert "native timezone" in caplog.text
+
+
+FEB_CENTRAL_RELEASE = pytz.timezone("America/Chicago").localize(
+    datetime(2018, 2, 15)
+)  # CST, -06:00
+MAR_CENTRAL_RELEASE = pytz.timezone("America/Chicago").localize(
+    datetime(2018, 3, 16)
+)  # CDT, -05:00 (DST began 2018-03-11)
+
+
+@pytest.fixture
+def central_stamped_time_series():
+    """A two-vintage FRED series whose release dates sit at midnight US Central."""
+    central = pytz.timezone("America/Chicago")
+
+    def build_vintage(release_date, vintages):
+        return MTTimeSeries._from_data(
+            dataset_id="CENTRAL",
+            release_date=release_date,
+            current_observations=[
+                MTObservation(
+                    timestamp=central.localize(datetime(2018, 1, 1)),
+                    value=100.0,
+                    release_date=release_date,
+                )
+            ],
+            vintages=vintages,
+            source="FRED",
+            units="Index",
+            frequency="MS",
+            title="Central-stamped series",
+            seasonal_adjustment=None,
+        )
+
+    february = build_vintage(FEB_CENTRAL_RELEASE, [])
+    return build_vintage(MAR_CENTRAL_RELEASE, [february])
+
+
+def test_as_of_calendar_string_includes_same_day_source_local_release(
+    central_stamped_time_series,
+):
+    # The date string resolves to Central midnight — exactly the same-day
+    # release stamp — so the 2018-03-16 vintage is eligible.
     assert (
-        "Datetime object provided without timezone info. Assuming UTC." in caplog.text
+        central_stamped_time_series.as_of("2018-03-16").release_date
+        == MAR_CENTRAL_RELEASE
     )
+    # The day before still resolves to the previous vintage.
+    assert (
+        central_stamped_time_series.as_of("2018-03-15").release_date
+        == FEB_CENTRAL_RELEASE
+    )
+
+
+def test_as_of_date_object_includes_same_day_source_local_release(
+    central_stamped_time_series,
+):
+    assert (
+        central_stamped_time_series.as_of(date(2018, 3, 16)).release_date
+        == MAR_CENTRAL_RELEASE
+    )
+
+
+def test_as_of_aware_instant_keeps_exact_comparison(central_stamped_time_series):
+    # Midnight UTC precedes the 05:00 UTC Central-midnight stamp, so an
+    # explicit aware instant still selects the previous vintage.
+    assert (
+        central_stamped_time_series.as_of(
+            datetime(2018, 3, 16, tzinfo=timezone.utc)
+        ).release_date
+        == FEB_CENTRAL_RELEASE
+    )
+    # An instant after the stamp includes it.
+    assert (
+        central_stamped_time_series.as_of(
+            datetime(2018, 3, 16, 6, 0, tzinfo=timezone.utc)
+        ).release_date
+        == MAR_CENTRAL_RELEASE
+    )
+
+
+def test_as_of_naive_datetime_read_on_source_clock(central_stamped_time_series):
+    # 3am naive means 3am US Central for a FRED series (08:00 UTC), which is
+    # after the 05:00 UTC release stamp — not 3am UTC, which would precede it.
+    assert (
+        central_stamped_time_series.as_of(datetime(2018, 3, 16, 3, 0)).release_date
+        == MAR_CENTRAL_RELEASE
+    )
+
+
+def test_as_of_bare_date_string_emits_no_warning(central_stamped_time_series, caplog):
+    central_stamped_time_series.as_of("2018-03-16")
+
+    assert "without timezone info" not in caplog.text
+    assert "Assuming" not in caplog.text
+
+
+def test_as_of_today_string_is_not_in_the_future(central_stamped_time_series):
+    # Today on the source's clock is never a future calendar day, whatever
+    # the wall clock reads in UTC or locally.
+    source_today = (
+        datetime.now(timezone.utc).astimezone(pytz.timezone("America/Chicago")).date()
+    )
+    assert (
+        central_stamped_time_series.as_of(source_today.isoformat()).release_date
+        == MAR_CENTRAL_RELEASE
+    )
+
+
+def test_as_of_future_date_string_raises(central_stamped_time_series):
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    with pytest.raises(ValueError, match="The target date cannot be in the future."):
+        central_stamped_time_series.as_of(tomorrow.isoformat())
 
 
 def test_to_darts_timeseries(sample_time_series):

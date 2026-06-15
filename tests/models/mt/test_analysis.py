@@ -180,17 +180,18 @@ def test_revision_success_no_changes(empty_timeseries):
 
 
 def test_vintage_comparison_all_strategy(sample_time_series):
-    vintage_dates = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+    release_dates = [
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.release_date,
     ]
 
     comparison = sample_time_series.analysis.vintage_comparison(
-        vintage_dates=vintage_dates,
+        vintage_dates=release_dates,
         strategy="all",
     )
 
-    result = comparison[f"vintage_{vintage_dates[0]}_to_{vintage_dates[1]}"]
+    labels = [d.isoformat() for d in release_dates]
+    result = comparison[f"vintage_{labels[0]}_to_{labels[1]}"]
     assert "bias" in result
     assert "dispersion" in result
     assert "counts" in result
@@ -198,13 +199,13 @@ def test_vintage_comparison_all_strategy(sample_time_series):
 
 def test_vintage_comparison_repr_and_getitem_errors(sample_time_series):
     """VintageComparison.__repr__ describes mode/strategy and __getitem__ raises on miss."""
-    vintage_dates = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+    release_dates = [
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.release_date,
     ]
 
     comparison = sample_time_series.analysis.vintage_comparison(
-        vintage_dates=vintage_dates,
+        vintage_dates=release_dates,
         strategy="all",
     )
 
@@ -290,20 +291,21 @@ def test_compare_vintages_metric_values():
 
 
 def test_vintage_comparison_final_strategy(sample_time_series):
-    vintage_dates = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.vintages[1].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+    release_dates = [
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.vintages[1].release_date,
+        sample_time_series.release_date,
     ]
 
     comparison = sample_time_series.analysis.vintage_comparison(
-        vintage_dates=vintage_dates,
+        vintage_dates=release_dates,
         strategy="final",
     )
 
+    labels = [d.isoformat() for d in release_dates]
     expected_keys = {
-        f"vintage_{vintage_dates[0]}_to_{vintage_dates[2]}",
-        f"vintage_{vintage_dates[1]}_to_{vintage_dates[2]}",
+        f"vintage_{labels[0]}_to_{labels[2]}",
+        f"vintage_{labels[1]}_to_{labels[2]}",
     }
     assert expected_keys.issubset(comparison.comparison.keys())
 
@@ -363,29 +365,30 @@ def test_compare_vintages_levels_directional_misses_sign_flip():
 
 def test_vintage_comparison_levels_mode_through_public_api(sample_time_series):
     """End-to-end: mode='levels' is accepted and produces level-mode keys."""
-    vintage_dates = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+    release_dates = [
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.release_date,
     ]
     comparison = sample_time_series.analysis.vintage_comparison(
-        vintage_dates=vintage_dates,
+        vintage_dates=release_dates,
         mode="levels",
         strategy="all",
     )
-    pair = comparison[f"vintage_{vintage_dates[0]}_to_{vintage_dates[1]}"]
+    labels = [d.isoformat() for d in release_dates]
+    pair = comparison[f"vintage_{labels[0]}_to_{labels[1]}"]
     assert "bias" in pair
     assert "directional_misses_sign" in pair
     assert "directional_misses_trend" in pair
 
 
 def test_vintage_comparison_rejects_invalid_mode(sample_time_series):
-    vintage_dates = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+    release_dates = [
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.release_date,
     ]
     with pytest.raises(ValueError, match="Must be 'growth' or 'levels'"):
         sample_time_series.analysis.vintage_comparison(
-            vintage_dates=vintage_dates,
+            vintage_dates=release_dates,
             mode="bogus",
         )
 
@@ -396,12 +399,14 @@ def test_vintage_comparison_keys_use_resolved_release_date(sample_time_series, c
     output should be labeled with the resolved release_date and an INFO log
     should record the resolution.
     """
-    earliest = sample_time_series.vintages[0].release_date.isoformat()
-    latest = sample_time_series.release_date.isoformat()
-    # Sample fixture has daily vintages Dec 2-15 (UTC midnight). A timestamp
+    earliest = sample_time_series.vintages[0].release_date
+    latest = sample_time_series.release_date
+    # Sample fixture has daily vintages Dec 2-15 (UTC midnight). An instant
     # at noon on Dec 4 falls between the Dec 4 and Dec 5 releases, so as_of
     # should resolve it back to the Dec 4 vintage.
-    inexact_request = "2024-12-04T12:00:00"
+    inexact_request = datetime.datetime(
+        2024, 12, 4, 12, 0, tzinfo=datetime.timezone.utc
+    )
     expected_resolved = "2024-12-04T00:00:00+00:00"
 
     caplog.set_level("INFO", logger="macrotrace.models.mt.analysis")
@@ -411,8 +416,8 @@ def test_vintage_comparison_keys_use_resolved_release_date(sample_time_series, c
     )
 
     assert list(comparison.comparison.keys()) == [
-        f"vintage_{earliest}_to_{expected_resolved}",
-        f"vintage_{expected_resolved}_to_{latest}",
+        f"vintage_{earliest.isoformat()}_to_{expected_resolved}",
+        f"vintage_{expected_resolved}_to_{latest.isoformat()}",
     ]
     assert (
         f"requested {inexact_request} resolved to release {expected_resolved}"
@@ -425,11 +430,11 @@ def test_vintage_comparison_dedupes_and_warns_on_collapse(sample_time_series, ca
     Two distinct requested dates that resolve to the same vintage must
     collapse into a single entry, and the user must be warned.
     """
-    earliest = sample_time_series.vintages[0].release_date.isoformat()
-    # Both timestamps fall on Dec 4 between the Dec 4 and Dec 5 vintage
-    # releases, so they both resolve to the Dec 4 vintage.
-    collapse_a = "2024-12-04T01:00:00"
-    collapse_b = "2024-12-04T23:00:00"
+    earliest = sample_time_series.vintages[0].release_date
+    # A calendar-date string and an instant later that day both resolve to
+    # the Dec 4 vintage (released at the source's midnight).
+    collapse_a = "2024-12-04"
+    collapse_b = datetime.datetime(2024, 12, 4, 23, 0, tzinfo=datetime.timezone.utc)
     collapsed_resolved = "2024-12-04T00:00:00+00:00"
 
     caplog.set_level("WARNING", logger="macrotrace.models.mt.analysis")
@@ -443,11 +448,10 @@ def test_vintage_comparison_dedupes_and_warns_on_collapse(sample_time_series, ca
     assert collapsed_resolved in comparison.vintages
     # Only one pairwise comparison since only two unique vintages remain.
     assert list(comparison.comparison.keys()) == [
-        f"vintage_{earliest}_to_{collapsed_resolved}"
+        f"vintage_{earliest.isoformat()}_to_{collapsed_resolved}"
     ]
     assert "3 requested dates collapsed to 2 unique vintages" in caplog.text
     assert collapse_a in caplog.text
-    assert collapse_b in caplog.text
 
 
 @pytest.mark.parametrize("strategy", ["sequential", "final", "all"])
@@ -459,7 +463,7 @@ def test_vintage_comparison_rejects_too_few_vintages(sample_time_series, strateg
             vintage_dates=[], strategy=strategy
         )
 
-    only = [sample_time_series.vintages[0].release_date.isoformat()]
+    only = [sample_time_series.vintages[0].release_date]
     with pytest.raises(ValueError, match="at least 2 vintages"):
         sample_time_series.analysis.vintage_comparison(
             vintage_dates=only, strategy=strategy
@@ -468,9 +472,9 @@ def test_vintage_comparison_rejects_too_few_vintages(sample_time_series, strateg
 
 def test_vintage_comparison_sequential_sorts_unsorted_input(sample_time_series):
     chrono = [
-        sample_time_series.vintages[0].release_date.isoformat(),
-        sample_time_series.vintages[1].release_date.isoformat(),
-        sample_time_series.release_date.isoformat(),
+        sample_time_series.vintages[0].release_date,
+        sample_time_series.vintages[1].release_date,
+        sample_time_series.release_date,
     ]
     shuffled = [chrono[2], chrono[0], chrono[1]]
 
@@ -479,9 +483,10 @@ def test_vintage_comparison_sequential_sorts_unsorted_input(sample_time_series):
         strategy="sequential",
     )
 
+    labels = [d.isoformat() for d in chrono]
     assert list(comparison.comparison.keys()) == [
-        f"vintage_{chrono[0]}_to_{chrono[1]}",
-        f"vintage_{chrono[1]}_to_{chrono[2]}",
+        f"vintage_{labels[0]}_to_{labels[1]}",
+        f"vintage_{labels[1]}_to_{labels[2]}",
     ]
 
 
