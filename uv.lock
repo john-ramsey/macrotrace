@@ -1587,7 +1587,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "darts", specifier = ">=0.35.0" },
-    { name = "numpy", specifier = ">=2.2.4" },
+    { name = "numpy", specifier = ">=2.2.4,<2.5" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "peewee", specifier = ">=4.0" },

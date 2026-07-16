@@ -31,7 +31,11 @@ classifiers = [
 
 dependencies = [
     "darts>=0.35.0",
-    "numpy>=2.2.4",
+    # Temporary ceiling: no released numba supports numpy>=2.5, and darts
+    # pulls numba in transitively. Without this, uv backtracks numba to
+    # 0.53.1 (Python 3.6-3.9 only) rather than backtracking numpy, and the
+    # install fails building numba's sdist. Lift when numba supports 2.5.
+    "numpy>=2.2.4,<2.5",
     "openpyxl>=3.1.0",
     "pandas>=2.2.3",
     "peewee>=4.0",

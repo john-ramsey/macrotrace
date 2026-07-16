@@ -3,6 +3,26 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## 0.3.1 — 2026-07-16
+
+- **Fixed:** macrotrace could not be installed with `uv` on a clean
+  environment. `uv add macrotrace` / `uv pip install macrotrace` failed
+  building `numba==0.53.1` ("Cannot install on Python version 3.13.x; only
+  versions >=3.6,<3.10 are supported"). macrotrace's `numpy` requirement had
+  no upper bound, and no released numba supports numpy >= 2.5 — so once numpy
+  2.5.0 landed on PyPI (2026-06-21), uv backtracked numba to 0.53.1 (March
+  2021, no wheels for supported Pythons) instead of backtracking numpy.
+  `numpy` is now capped at `<2.5`, which resolves to numba 0.66.0 + numpy
+  2.4.x. The cap is temporary and will be lifted when numba supports numpy
+  2.5.
+
+  **0.3.0 and earlier are uninstallable via uv on any fresh install since
+  2026-06-21** — this is triggered by upstream numpy, not by anything that
+  changed in those releases, so pinning to an older macrotrace does not
+  help. Upgrade to 0.3.1 instead. Installs via `pip` were never affected
+  (pip honours numba's `Requires-Python` and excludes 0.53.1), as were
+  existing environments and lockfiles resolved before 2026-06-21.
+
 ## 0.3.0 — 2026-06-15
 
 - **Breaking:** Naive date inputs (`as_of`, the vintage/data windows,
