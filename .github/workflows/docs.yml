@@ -53,19 +53,32 @@ jobs:
             uv run mike set-default --push latest
           fi
 
+      # Publish to GitHub Pages only on tag releases (or a manual dispatch),
+      # never on ordinary main pushes. A release fires two Docs runs in quick
+      # succession -- the main-merge "dev" deploy and the tag deploy -- and when
+      # two Pages deployments land within minutes GitHub's CDN can leave the
+      # origin stuck on the earlier one (the active/successful deploy never wins
+      # at the edge). Both these steps and the deploy job below build the
+      # artifact from gh-pages HEAD, which is cumulative and already correct, so
+      # gating publish to tags yields exactly one deployment per release.
+      # dev docs still land in gh-pages on every main push; they reach the live
+      # site at the next release (or via a manual workflow_dispatch).
       - name: Checkout gh-pages for Pages upload
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           path: gh-pages-build
 
       - name: Upload Pages artifact
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-pages-artifact@v3
         with:
           path: gh-pages-build
 
   deploy:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -77,3 +90,25 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Safety net for the GitHub-side stale-origin flake: confirm the released
+      # version actually shows up in the live versions.json. If it doesn't, the
+      # deploy "succeeded" but the CDN is serving an older artifact -- fail
+      # loudly so it's caught here instead of by a human, and re-run this job to
+      # republish the (already correct) gh-pages HEAD. Cache-bust each poll to
+      # bypass the ~10 min edge cache on versions.json and hit the origin.
+      - name: Verify released version is live
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE="https://john-ramsey.github.io/macrotrace/versions.json"
+          for i in $(seq 1 24); do
+            if curl -fsSL "${BASE}?cb=${GITHUB_RUN_ID}-${i}" | grep -q "\"${VERSION}\""; then
+              echo "✓ ${VERSION} is live"
+              exit 0
+            fi
+            echo "waiting for ${VERSION} at origin (attempt ${i}/24)..."
+            sleep 15
+          done
+          echo "::error::${VERSION} not live after ~6min. The deploy succeeded but GitHub Pages is serving a stale artifact -- re-run this deploy job to republish gh-pages HEAD."
+          exit 1
