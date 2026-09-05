@@ -3,6 +3,28 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## 0.4.0 — 2026-09-05
+
+- **Sources:** Added credential-free access to the World Bank's historical
+  World Development Indicators Database Archives (source `57`). WDI indicators
+  can be loaded by country or economy through `MTTimeSeries` and used with the
+  existing `as_of()`, vintage-matrix, and `identify_vintage()` workflows.
+- **WDI editions:** Exact `YYYYMM` edition identifiers and source provenance are
+  preserved. Because the archive exposes month rather than release-day
+  precision, editions use a conservative month-end UTC vintage timestamp.
+- **WDI retrieval:** Added paginated edition discovery and exact-edition
+  retrieval, immutable caching for historical responses, bounded retries for
+  rate limits and transient server or network failures, support for
+  `Retry-After`, and strict validation of World Bank response metadata.
+- **WDI coverage:** Missing and null observations remain missing rather than
+  being forward-filled across editions. Empty editions are recorded as valid
+  completed requests so they are not repeatedly downloaded.
+- **WDI entities:** Added low-level bulk panel retrieval and explicit,
+  provenance-preserving fallbacks between historical and current economy codes.
+- **Breaking:** Databases created with the older observation schema are not
+  migrated automatically. Recreate them before loading multidimensional source
+  data such as WDI or ONS series.
+
 ## 0.3.1 — 2026-07-16
 
 - **Fixed:** macrotrace could not be installed with `uv` on a clean

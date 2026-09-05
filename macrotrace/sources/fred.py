@@ -1,3 +1,11 @@
+"""Federal Reserve Economic Data (FRED) source support.
+
+The integration uses the Federal Reserve Bank of St. Louis API to ingest
+series metadata, vintage release dates, and observations through MacroTrace's
+standard storage model. FRED requests require ``FRED_API_KEY``, and source
+dates are stored using the ``America/Chicago`` timezone.
+"""
+
 import os
 from datetime import datetime
 from typing import Any, List, Optional, Dict
@@ -15,6 +23,7 @@ from macrotrace.sources.base import (
     ReleaseManager,
     SeriesManager,
     ObservationManager,
+    SourceAdapter,
     UpdateState,
 )
 from macrotrace.models.db import (
@@ -591,32 +600,23 @@ class FredObservationManager(ObservationManager):
 
 
 class FredUpdateManager(UpdateManager):
-    NATIVE_OBSERVATION_TZ = US_CENTRAL
-
     def __init__(
         self,
         dataset_id: str,
         source: str = FRED_SOURCE,
-        series_key: Dict[str, str] = {},
+        series_key: Optional[Dict[str, str]] = None,
         release_start_date: Optional[datetime] = None,
         release_end_date: Optional[datetime] = None,
         db_path: Optional[str] = None,
         cache_settings: Optional[Dict[str, Any]] = None,
         cache_path: Optional[str] = None,
     ):
-        # Recall that FRED series do not have keys
-        # They only have a single dimension other than time
-        if series_key != {}:
-            logger.warning(
-                f"FRED series do not have series keys. Ignoring provided series_key={series_key}"
-            )
-
         logger.debug(f"Initializing FredUpdateManager for dataset_id={dataset_id}")
 
         super().__init__(
             dataset_id=dataset_id,
             source=source,
-            series_key=None,
+            series_key=series_key or {},
             release_start_date=release_start_date,
             release_end_date=release_end_date,
             db_path=db_path,
@@ -646,3 +646,45 @@ class FredUpdateManager(UpdateManager):
     def _create_observation_manager(self) -> ObservationManager:
         """Override this to provide a specific observation manager."""
         return FredObservationManager(self.api_client)
+
+
+class FredSourceAdapter(SourceAdapter):
+    """Provide lightweight FRED behavior and updater construction."""
+
+    source = FRED_SOURCE
+    native_observation_timezone = US_CENTRAL
+
+    def normalize_series_key(
+        self,
+        dataset_id: str,
+        series_key: Optional[Dict[str, str]],
+    ) -> Dict[str, str]:
+        normalized = super().normalize_series_key(dataset_id, series_key)
+        if normalized:
+            logger.warning(
+                f"FRED series do not have series keys. Ignoring provided series_key={series_key}"
+            )
+        return {}
+
+    def create_update_manager(
+        self,
+        dataset_id: str,
+        series_key: Dict[str, str],
+        release_start_date: Optional[datetime] = None,
+        release_end_date: Optional[datetime] = None,
+        db_path: Optional[str] = None,
+        cache_settings: Optional[Dict[str, Any]] = None,
+        cache_path: Optional[str] = None,
+    ) -> FredUpdateManager:
+        return FredUpdateManager(
+            dataset_id=dataset_id,
+            series_key=series_key,
+            release_start_date=release_start_date,
+            release_end_date=release_end_date,
+            db_path=db_path,
+            cache_settings=cache_settings,
+            cache_path=cache_path,
+        )
+
+
+FRED_SOURCE_ADAPTER = FredSourceAdapter()

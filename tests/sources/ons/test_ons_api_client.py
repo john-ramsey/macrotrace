@@ -1,6 +1,10 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
 
 from macrotrace.sources.ons import (
+    ONSAPIClient,
     _retry_after_seconds,
     wait_retry_after_or_fallback,
     is_429,
@@ -9,6 +13,18 @@ from macrotrace.sources.ons import (
 
 # Note that importing db_setup_and_teardown fixture sets up and tears down the database for each test automatically
 from tests.sources.ons.fixtures import api_client, db_setup_and_teardown
+
+
+def response(status: int, payload=None, *, retry_after=None):
+    result = requests.Response()
+    result.status_code = status
+    result._content = b""
+    result.url = "https://api.beta.ons.gov.uk/test"
+    result.request = requests.Request("GET", result.url).prepare()
+    if retry_after is not None:
+        result.headers["Retry-After"] = retry_after
+    result.json = MagicMock(return_value=payload)
+    return result
 
 
 def test_ons_request_headers(api_client):
@@ -147,3 +163,62 @@ def test_is_429_fails():
     exception.response = resp
 
     assert is_429(exception) is False
+
+
+@pytest.mark.parametrize(
+    ("status", "retry_after", "expected_wait"),
+    [(429, "7", 7.0), (503, None, 2)],
+)
+def test_make_request_retries_transient_http_errors(
+    api_client, status, retry_after, expected_wait
+):
+    api_client.session = MagicMock()
+    api_client.session.get.side_effect = [
+        response(status, retry_after=retry_after),
+        response(200, {"items": []}),
+    ]
+
+    with patch.object(ONSAPIClient.make_request.retry, "sleep") as sleep:
+        result = api_client.make_request("datasets")
+
+    assert result == {"items": []}
+    sleep.assert_called_once_with(expected_wait)
+    assert api_client.session.get.call_count == 2
+
+
+@pytest.mark.parametrize("error", [requests.Timeout(), requests.ConnectionError()])
+def test_make_request_retries_network_errors(api_client, error):
+    api_client.session = MagicMock()
+    api_client.session.get.side_effect = [
+        error,
+        response(200, {"items": []}),
+    ]
+
+    with patch.object(ONSAPIClient.make_request.retry, "sleep") as sleep:
+        result = api_client.make_request("datasets")
+
+    assert result == {"items": []}
+    sleep.assert_called_once_with(2)
+    assert api_client.session.get.call_count == 2
+
+
+def test_make_request_stops_after_four_attempts(api_client):
+    api_client.session = MagicMock()
+    api_client.session.get.return_value = response(503)
+
+    with patch.object(ONSAPIClient.make_request.retry, "sleep") as sleep:
+        with pytest.raises(requests.HTTPError):
+            api_client.make_request("datasets")
+
+    assert api_client.session.get.call_count == 4
+    assert sleep.call_count == 3
+
+
+def test_make_request_does_not_retry_permanent_http_error(api_client):
+    api_client.session = MagicMock()
+    api_client.session.get.return_value = response(404)
+
+    with pytest.raises(requests.HTTPError):
+        api_client.make_request("datasets")
+
+    api_client.session.get.assert_called_once()

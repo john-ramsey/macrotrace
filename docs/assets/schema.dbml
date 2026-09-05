@@ -103,7 +103,7 @@ Table Observation {
   created_at datetime [not null]
 
   indexes {
-    (release_id, observation_timestamp) [unique]
+    (series_id, release_id, observation_timestamp) [unique]
   }
 
   Note: 'A single observed value for a Series within a Release.'

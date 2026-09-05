@@ -459,7 +459,7 @@ def test_observation_linking(sample_dataset):
 
 
 def test_observation_uniqueness_constraint(sample_dataset):
-    """Test that duplicate observations for the same release and timestamp cannot be created."""
+    """Reject duplicate timestamps within the same series and release."""
     series = Series.create(
         dataset=sample_dataset,
         series_key={"indicator": "PAYEMS"},
@@ -486,6 +486,38 @@ def test_observation_uniqueness_constraint(sample_dataset):
             observation_timestamp=obs_timestamp,
             value=146000,
         )
+
+
+def test_observation_uniqueness_is_scoped_to_series(sample_dataset):
+    """Two series can carry values for the same dataset release and timestamp."""
+    first_series = Series.create(
+        dataset=sample_dataset,
+        series_key={"country": "USA"},
+    )
+    second_series = Series.create(
+        dataset=sample_dataset,
+        series_key={"country": "CAN"},
+    )
+    release = Release.create(
+        dataset=sample_dataset,
+        release_date=datetime.datetime(2023, 1, 1, tzinfo=UTC),
+    )
+    timestamp = datetime.datetime(2022, 1, 1, tzinfo=UTC)
+
+    Observation.create(
+        series=first_series,
+        release=release,
+        observation_timestamp=timestamp,
+        value=100.0,
+    )
+    Observation.create(
+        series=second_series,
+        release=release,
+        observation_timestamp=timestamp,
+        value=200.0,
+    )
+
+    assert Observation.select().count() == 2
 
 
 def test_observation_null_value(sample_dataset):

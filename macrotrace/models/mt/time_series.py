@@ -24,18 +24,34 @@ from macrotrace.models.mt.plotter import MTTimeSeriesPlotter
 from macrotrace.models.mt.analysis import MTTimeSeriesAnalysis
 
 if TYPE_CHECKING:  # pragma: no cover
-    from macrotrace.sources.base import UpdateManager, UpdateState
+    from macrotrace.sources.base import SourceAdapter, UpdateManager, UpdateState
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-VALID_SOURCES = ["FRED", "ONS", "RTDSM", "USER"]
 # USER is for user provided data, not from an API
 
 # With fewer observations than this, a constant-shift scan can match a vintage
 # by coincidence, so identify_vintage only reports shift hints above it.
 MIN_OBSERVATIONS_FOR_SHIFT_DETECTION = 5
+
+
+def _source_adapters() -> Dict[str, "SourceAdapter"]:
+    """Return source adapters without importing them during module initialization."""
+    from macrotrace.sources.fred import FRED_SOURCE_ADAPTER
+    from macrotrace.sources.ons import ONS_SOURCE_ADAPTER
+    from macrotrace.sources.rtdsm import RTDSM_SOURCE_ADAPTER
+    from macrotrace.sources.user import USER_SOURCE_ADAPTER
+    from macrotrace.sources.wdi import WDI_SOURCE_ADAPTER
+
+    return {
+        "FRED": FRED_SOURCE_ADAPTER,
+        "ONS": ONS_SOURCE_ADAPTER,
+        "RTDSM": RTDSM_SOURCE_ADAPTER,
+        "WDI": WDI_SOURCE_ADAPTER,
+        "USER": USER_SOURCE_ADAPTER,
+    }
 
 
 @dataclass
@@ -53,8 +69,8 @@ class VintageMatch:
         atol: Absolute tolerance used for the value comparison.
         decimals: Number of decimals both sides were rounded to before comparison, or None when no rounding was applied.
         n_vintages_compared: Total number of vintages the supplied data was compared against.
-        n_vintages_covering: Number of vintages containing every supplied timestamp. When zero, the data failed on coverage rather than on values — see ``failure_reason``.
-        alignment_hint: When nothing matched but a diagnostic pass found a reinterpretation of the timestamps under which the values do match (wrong timezone localization, a constant time shift, or a different day-of-period convention), a human-readable description of it. The hinted reinterpretation never counts as a match — fix the index and re-run.
+        n_vintages_covering: Number of vintages containing every supplied timestamp. When zero, the data failed on coverage rather than on values; see ``failure_reason``.
+        alignment_hint: When nothing matched but a diagnostic pass found a reinterpretation of the timestamps under which the values do match (wrong timezone localization, a constant time shift, or a different day-of-period convention), a human-readable description of it. The hinted reinterpretation never counts as a match; fix the index and re-run.
         time_shift: The constant shift that, added to the supplied index, makes the values match at least one vintage. Only set when the hint came from the constant-shift detector.
     """
 
@@ -83,7 +99,7 @@ class VintageMatch:
         """
         Why the supplied data matched no vintage, or None when it matched.
 
-        Returns "coverage" when no vintage contains the supplied timestamps — usually a sign the index dates or timezone are wrong rather than the values — and "values" when at least one vintage contains the timestamps but none matched (the values disagreed, or ``require_exact_coverage`` excluded vintages carrying extra observations).
+        Returns "coverage" when no vintage contains the supplied timestamps, usually a sign the index dates or timezone are wrong rather than the values, and "values" when at least one vintage contains the timestamps but none matched (the values disagreed, or ``require_exact_coverage`` excluded vintages carrying extra observations).
 
         Returns:
             Optional[str]: "coverage", "values", or None when the data matched.
@@ -145,7 +161,7 @@ class MTTimeSeries:
         self,
         dataset_id: str,
         source: str,
-        series_key: Dict[str, str] = None,
+        series_key: Optional[Dict[str, str]] = None,
         # vintage_start_date and vintage_end_date define the vintage window returned
         # by this MTTimeSeries instance. Update managers may still backfill outside
         # the requested window so future loads can move backward without data loss.
@@ -161,19 +177,18 @@ class MTTimeSeries:
     ):
         """Load time series data from database and/or API.
 
+        All four date windows are inclusive and accept a ``YYYY-MM-DD``
+        string, a ``datetime.date``, or a datetime. Naive input is read on
+        the source's own clock. A date becomes the source's midnight on that day,
+        matching how sources stamp their releases and observations. For example,
+        ``vintage_end_date="2018-03-16"`` includes FRED's 2018-03-16
+        release even though it is stored at midnight US Central.
+        Pass an aware datetime to bound by an exact instant instead.
+
         Args:
             dataset_id: Dataset identifier (e.g., "GDP", "UNRATE")
             source: Data source ("FRED", "ONS", etc.)
-            series_key: Dictionary of dimension filters for multi-dimensional datasets
-
-            All four date windows are inclusive and accept a ``YYYY-MM-DD``
-            string, a ``datetime.date``, or a datetime. Naive input is read on
-            the source's own clock. A date becomes the source's midnight on that day,
-            matching how sources stamp their releases and observations — so e.g.
-            ``vintage_end_date="2018-03-16"`` includes FRED's 2018-03-16
-            release even though it is stored at midnight US Central.
-            Pass an aware datetime to bound by an exact instant instead.
-
+            series_key: Dictionary of dimension filters for multi-dimensional datasets.
             vintage_start_date: Only load vintages released on or after this date
             vintage_end_date: Only load vintages released on or before this date
             data_start_date: Only keep observations stamped on or after this date
@@ -190,7 +205,9 @@ class MTTimeSeries:
         """
         self.dataset_id = dataset_id
         self._set_source(source)
-        self.series_key = series_key or {}
+        self.series_key = self.source_adapter.normalize_series_key(
+            self.dataset_id, series_key
+        )
         self.db_path = db_path
         self.cache_path = cache_path
 
@@ -201,7 +218,18 @@ class MTTimeSeries:
         self.data_end_date = self._clean_date(data_end_date)
 
         # Only construct an update manager when we intend to refresh from the source.
-        updater = self._get_update_manager() if update_prior_to_load else None
+        updater = (
+            self.source_adapter.create_update_manager(
+                dataset_id=self.dataset_id,
+                series_key=self.series_key,
+                release_start_date=self.vintage_start_date,
+                release_end_date=self.vintage_end_date,
+                db_path=self.db_path,
+                cache_path=self.cache_path,
+            )
+            if update_prior_to_load
+            else None
+        )
         state = self._fetch_or_load_state(updater, update_prior_to_load)
 
         # Load all vintages from releases
@@ -339,6 +367,10 @@ class MTTimeSeries:
         instance.current_observations = current_observations
         instance.vintages = vintages
         instance.source = source
+        source_adapters = _source_adapters()
+        instance.source_adapter = source_adapters.get(
+            source.upper(), source_adapters["USER"]
+        )
         instance.series_key = series_key or {}
         instance.vintage_start_date = None
         instance.vintage_end_date = None
@@ -486,12 +518,12 @@ class MTTimeSeries:
         A vintage may carry extra observations the data does not include.
         When the data does not change across consecutive vintages the match is necessarily ambiguous, and all consistent release dates are returned.
 
-        When nothing matches, a diagnostic pass checks whether the values would match under a common timestamp misalignment — the index localized to the wrong timezone, shifted by a constant offset, or stamped with a different day-of-period convention (e.g. month-end instead of month-start) — and reports it via ``VintageMatch.alignment_hint``.
+        When nothing matches, a diagnostic pass checks whether the values would match under a common timestamp misalignment, such as the index localized to the wrong timezone, shifted by a constant offset, or stamped with a different day-of-period convention (e.g. month-end instead of month-start), and reports it via ``VintageMatch.alignment_hint``.
         A hinted reinterpretation is never counted as a match.
 
         Args:
             series (pd.Series): The data to identify, indexed by observation date.
-                A tz-naive index (dates, date strings, or naive timestamps) is interpreted in the source's native observation timezone — e.g. midnight US Central for FRED — falling back to UTC with a warning when the source has no registered manager.
+                A tz-naive index (dates, date strings, or naive timestamps) is interpreted in the source's native observation timezone, e.g. midnight US Central for FRED, falling back to UTC with a warning when the source has no registered manager.
                 A ``pd.PeriodIndex`` is compared on each period's start timestamp.
                 A numeric index is rejected, because pandas would silently read it as nanosecond offsets from 1970 rather than dates.
                 Null values are dropped before matching.
@@ -657,7 +689,7 @@ class MTTimeSeries:
         """
         Look for a timestamp reinterpretation under which the unmatched data would match.
 
-        Runs the detectors from most to least specific — wrong timezone localization, a constant time shift, then a day-of-period convention mismatch — and stops at the first that fires.
+        Runs the detectors from most to least specific: wrong timezone localization, a constant time shift, then a day-of-period convention mismatch. It stops at the first that fires.
 
         Args:
             candidate (pd.Series): The prepared candidate series (UTC index).
@@ -707,7 +739,7 @@ class MTTimeSeries:
         """
         Check whether the data matches when its wall-clock times are read in the source's native timezone.
 
-        Only applies to a tz-aware index (a naive one already went through the native timezone), and catches indexes localized to the wrong timezone — including across DST changes, where the error is not a constant offset.
+        Only applies to a tz-aware index (a naive one already went through the native timezone), and catches indexes localized to the wrong timezone, including across DST changes where the error is not a constant offset.
 
         Returns:
             Optional[str]: The hint, or None when the detector did not fire.
@@ -806,7 +838,7 @@ class MTTimeSeries:
         """
         Check whether the data matches a vintage when both are compared by calendar period.
 
-        Reduces both indexes to periods at the series frequency (daily or coarser), which washes out time-of-day and day-of-period conventions — catching e.g. month-end dates against month-start storage, a mismatch that is not a constant offset.
+        Reduces both indexes to periods at the series frequency (daily or coarser), which washes out time-of-day and day-of-period conventions. This catches, for example, month-end dates against month-start storage, a mismatch that is not a constant offset.
 
         Returns:
             Optional[str]: The hint, or None when the detector did not fire.
@@ -1057,7 +1089,7 @@ class MTTimeSeries:
                 Supports "default" (unmodified observations), "first_difference" (first differences of observations), and "pct_change" (percentage change of observations).
                 Defaults to "default".
             tz (str, optional): How to render the ``timestamp`` and ``release_date`` columns.
-                ``"utc"`` (default) returns a tz-aware UTC ``datetime64[ns, UTC]`` column —
+                ``"utc"`` (default) returns a tz-aware UTC ``datetime64[ns, UTC]`` column:
                 absolute time, the same instant the source published. ``"source"`` returns a
                 tz-naive column anchored on the source's wall-clock calendar (e.g. a FRED
                 ``2010-02-01`` print stays ``2010-02-01 00:00`` instead of becoming
@@ -1293,12 +1325,16 @@ class MTTimeSeries:
 
     def _set_source(self, source: str):
         """Validate and set the data source."""
-        source_upper = source.upper()
-        if source_upper not in VALID_SOURCES:
+        source = source.upper()
+        source_adapters = _source_adapters()
+        try:
+            self.source_adapter = source_adapters[source]
+        except KeyError:
             raise ValueError(
-                f"Unsupported source: {source}. Must be one of {VALID_SOURCES}"
-            )
-        self.source = source_upper
+                f"Unsupported source: {source}. "
+                f"Must be one of {list(source_adapters)}"
+            ) from None
+        self.source = self.source_adapter.source
 
     def _clean_date(self, dt: str | datetime | date) -> Optional[datetime]:
         """
@@ -1381,9 +1417,13 @@ class MTTimeSeries:
             observations = observations[:-1]
         return observations
 
-    def _get_observations_for_release(self, release_pk: int) -> List[Observation]:
-        """Get all observations associated with the release PK."""
+    def _get_observations_for_release(
+        self, release_pk: int, series_pk: Optional[int] = None
+    ) -> List[Observation]:
+        """Get observations associated with a release and, when given, a series."""
         conditions = [Observation.release == release_pk]
+        if series_pk is not None:
+            conditions.append(Observation.series == series_pk)
         if self.data_start_date:
             conditions.append(Observation.observation_timestamp >= self.data_start_date)
         if self.data_end_date:
@@ -1444,56 +1484,17 @@ class MTTimeSeries:
         """
         return self.vintages + [self]
 
-    @staticmethod
-    def _source_manager_classes() -> Dict[str, type]:
-        """Map source names to their UpdateManager classes, imported lazily to avoid circular imports."""
-        from macrotrace.sources.fred import FredUpdateManager
-        from macrotrace.sources.ons import ONSUpdateManager
-        from macrotrace.sources.rtdsm import RTDSMUpdateManager
-
-        return {
-            "FRED": FredUpdateManager,
-            "ONS": ONSUpdateManager,
-            "RTDSM": RTDSMUpdateManager,
-        }
-
     def _native_observation_timezone(self) -> tzinfo:
         """
         The timezone this series' source stamps observation timestamps with.
 
-        Looked up from the source's update manager class (``NATIVE_OBSERVATION_TZ``).
-        Sources without a registered manager (e.g. user-provided data) fall back to UTC.
+        Looked up from the lightweight source adapter without constructing an
+        API client or update manager.
 
         Returns:
-            tzinfo: The source's declared observation timezone, or UTC.
+            tzinfo: The source's declared observation timezone.
         """
-        manager_class = self._source_manager_classes().get(self.source)
-        if manager_class is None:
-            return timezone.utc
-        return manager_class.NATIVE_OBSERVATION_TZ
-
-    def _get_update_manager(self):
-        """Get the appropriate update manager for the data source.
-
-        Returns:
-            UpdateManager: An instance of the appropriate update manager class.
-        """
-        source_managers = self._source_manager_classes()
-
-        assert (
-            self.source in source_managers.keys()
-        ), f"Unsupported source: {self.source}. No update manager available."
-
-        updater_class = source_managers[self.source]
-
-        return updater_class(
-            dataset_id=self.dataset_id,
-            series_key=self.series_key,
-            release_start_date=self.vintage_start_date,
-            release_end_date=self.vintage_end_date,
-            db_path=self.db_path,
-            cache_path=self.cache_path,
-        )
+        return self.source_adapter.native_observation_timezone
 
     def _ensure_local_database_initialized(self):
         """Ensure the current model database is ready for local-only loads."""
@@ -1642,7 +1643,7 @@ class MTTimeSeries:
         Returns:
             Optional[MTTimeSeries]: The built time series vintage, or None if no observations.
         """
-        observations = self._get_observations_for_release(release.id)
+        observations = self._get_observations_for_release(release.id, state.series.id)
 
         # Skip releases without observations
         if len(observations) == 0:

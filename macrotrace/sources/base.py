@@ -10,7 +10,7 @@ from peewee import fn, JOIN
 from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
 
-from macrotrace.models import (
+from macrotrace.models.db import (
     Dataset,
     DatasetDimension,
     Release,
@@ -114,6 +114,34 @@ class APIClient:
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    def _make_response(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        **request_kwargs: Any,
+    ) -> requests.Response:
+        """Make an HTTP request and return the validated response."""
+        headers = dict(self._get_request_headers())
+        headers["User-Agent"] = self.user_agent
+        merged_params = self._get_default_params() | (params or {})
+
+        logger.debug(
+            f"Making API request to endpoint: {endpoint} with params: {merged_params}"
+        )
+        response = self.session.get(
+            self.base_url + endpoint,
+            headers=headers,
+            params=merged_params,
+            **request_kwargs,
+        )
+        is_cached = getattr(response, "from_cache", False)
+        logger.debug(
+            f"API response received: status={response.status_code}, "
+            f"cached={is_cached}, size={len(response.content)} bytes"
+        )
+        response.raise_for_status()
+        return response
+
     @retry(
         stop=stop_after_attempt(4),
         wait=wait_exponential(max=30),
@@ -133,30 +161,7 @@ class APIClient:
         Returns:
             Dict[str, Any]: JSON response from the API
         """
-        headers = self._get_request_headers()
-        # Merge user agent into headers
-        headers["User-Agent"] = self.user_agent
-
-        default_params = self._get_default_params()
-        params = default_params | params
-
-        logger.debug(
-            f"Making API request to endpoint: {endpoint} with params: {params}"
-        )
-
-        resp = self.session.get(
-            self.base_url + endpoint, headers=headers, params=params
-        )
-
-        # Check if response came from cache
-        is_cached = getattr(resp, "from_cache", False)
-        logger.debug(
-            f"API response received: status={resp.status_code}, "
-            f"cached={is_cached}, size={len(resp.content)} bytes"
-        )
-
-        resp.raise_for_status()
-        return resp.json()
+        return self._make_response(endpoint, params).json()
 
     def make_paginated_request(
         self,
@@ -690,12 +695,39 @@ class ObservationManager:
         raise NotImplementedError("Subclasses must implement this method.")
 
 
+class SourceAdapter:
+    """Lightweight source behavior used before an update manager is needed."""
+
+    source: str
+    native_observation_timezone: tzinfo
+
+    def normalize_series_key(
+        self,
+        dataset_id: str,
+        series_key: Optional[Dict[str, str]],
+    ) -> Dict[str, str]:
+        """Normalize a source-specific series key to its stored form."""
+        if series_key is None:
+            return {}
+        if not isinstance(series_key, dict):
+            raise TypeError("series_key must be a dictionary for this source.")
+        return series_key
+
+    def create_update_manager(
+        self,
+        dataset_id: str,
+        series_key: Dict[str, str],
+        release_start_date: Optional[datetime] = None,
+        release_end_date: Optional[datetime] = None,
+        db_path: Optional[str] = None,
+        cache_settings: Optional[Dict[str, Any]] = None,
+        cache_path: Optional[str] = None,
+    ) -> "UpdateManager":
+        """Create the source's update manager for a normalized series key."""
+        raise NotImplementedError("Source does not provide an update manager.")
+
+
 class UpdateManager:
-    # The timezone this source stamps observation timestamps with. Every
-    # subclass must declare its own — MTTimeSeries.identify_vintage uses it to
-    # interpret tz-naive candidate data, so a wrong value silently breaks
-    # matching for that source.
-    NATIVE_OBSERVATION_TZ: tzinfo
 
     def __init__(
         self,
@@ -741,7 +773,7 @@ class UpdateManager:
         Returns:
             The initialized database instance.
         """
-        from macrotrace.models import LOCAL_DATABASE
+        from macrotrace.models.db import LOCAL_DATABASE
 
         db_path = resolve_db_path(db_path)
 

@@ -8,6 +8,7 @@ from macrotrace.sources.base import (
     DatasetManager,
     SeriesManager,
     ReleaseManager,
+    SourceAdapter,
     ObservationManager,
     UpdateManager,
 )
@@ -29,6 +30,24 @@ def test_initialize_update_manager_fails():
     """Test that initializing the base UpdateManager raises NotImplementedError. We should not be able to instantiate it directly."""
     with pytest.raises(NotImplementedError):
         UpdateManager(dataset_id="TEST", source="SOURCE")
+
+
+def test_source_adapter_normalizes_generic_dictionary_form():
+    """Normalize missing keys and reject non-dictionary keys."""
+    adapter = SourceAdapter()
+
+    assert adapter.normalize_series_key("TEST", None) == {}
+    assert adapter.normalize_series_key("TEST", {"country": "USA"}) == {
+        "country": "USA"
+    }
+    with pytest.raises(TypeError, match="must be a dictionary"):
+        adapter.normalize_series_key("TEST", "USA")
+
+
+def test_source_adapter_has_no_default_update_manager():
+    """Require updating sources to provide their own manager factory."""
+    with pytest.raises(NotImplementedError, match="does not provide"):
+        SourceAdapter().create_update_manager("TEST", {})
 
 
 def test_create_api_client():

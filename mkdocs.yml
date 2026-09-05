@@ -43,6 +43,7 @@ nav:
       - FRED: sources/fred.md
       - ONS: sources/ons.md
       - RTDSM: sources/rtdsm.md
+      - WDI Archives: sources/wdi.md
       - Custom Data: sources/custom.md
   - Workflows:
       - Reconstructing the Real-Time View: workflows/reconstructing-the-real-time-view.md
@@ -65,6 +66,7 @@ nav:
           - FRED: api/sources/fred.md
           - ONS: api/sources/ons.md
           - RTDSM: api/sources/rtdsm.md
+          - WDI Archives: api/sources/wdi.md
   - Development:
       - Contributing: development/contributing.md
       - Testing: development/testing.md

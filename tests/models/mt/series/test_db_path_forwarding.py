@@ -28,15 +28,21 @@ def empty_ts():
     return instance
 
 
-def test_get_update_manager_forwards_db_and_cache_path(empty_ts):
+def test_source_adapter_forwards_db_and_cache_path(empty_ts):
     os.environ["FRED_API_KEY"] = "test"
     empty_ts.db_path = "/tmp/forward.db"
     empty_ts.cache_path = "/tmp/forward.sqlite"
+    empty_ts._set_source("FRED")
 
     with patch(
         "macrotrace.sources.fred.FredUpdateManager.__init__", return_value=None
     ) as mock_init:
-        empty_ts._get_update_manager()
+        empty_ts.source_adapter.create_update_manager(
+            dataset_id=empty_ts.dataset_id,
+            series_key={},
+            db_path=empty_ts.db_path,
+            cache_path=empty_ts.cache_path,
+        )
 
     mock_init.assert_called_once()
     kwargs = mock_init.call_args.kwargs
@@ -44,13 +50,17 @@ def test_get_update_manager_forwards_db_and_cache_path(empty_ts):
     assert kwargs["cache_path"] == "/tmp/forward.sqlite"
 
 
-def test_get_update_manager_forwards_none_by_default(empty_ts):
+def test_source_adapter_forwards_none_by_default(empty_ts):
     os.environ["FRED_API_KEY"] = "test"
+    empty_ts._set_source("FRED")
 
     with patch(
         "macrotrace.sources.fred.FredUpdateManager.__init__", return_value=None
     ) as mock_init:
-        empty_ts._get_update_manager()
+        empty_ts.source_adapter.create_update_manager(
+            dataset_id=empty_ts.dataset_id,
+            series_key={},
+        )
 
     kwargs = mock_init.call_args.kwargs
     assert kwargs["db_path"] is None
