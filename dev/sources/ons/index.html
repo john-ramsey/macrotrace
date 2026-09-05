@@ -551,6 +551,8 @@
       
         
       
+        
+      
     
     
     
@@ -825,6 +827,34 @@
     
   
     RTDSM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wdi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WDI Archives
   
 
     
@@ -1497,6 +1527,8 @@
       
         
       
+        
+      
     
     
     
@@ -1640,6 +1672,34 @@
     
   
     RTDSM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sources/wdi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WDI Archives
   
 
     
@@ -1986,8 +2046,7 @@
 </code></pre></div>
 <h2 id="finding-series-ids-and-building-series-keys">Finding Series IDs and Building Series Keys</h2>
 <p>Currently, the ONS does not provide an easy UI to assemble series keys. In the API's current state, you must explore the dataset metadata via API to find the relevant dimensions and options, then construct their <code>series_key</code> manually. The optional ONS TUI provides an interactive way to browse datasets, editions, versions, dimensions, and options to build a valid <code>series_key</code> without needing to read through API documentation.</p>
-<p>If Macrotrace is installed in your environment with the ONS TUI extra, you can run the ONS tools through
-the top-level <code>macrotrace</code> command:</p>
+<p>If Macrotrace is installed in your environment with the ONS TUI extra, you can run the ONS tools through the top-level <code>macrotrace</code> command:</p>
 <p>Examples:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># From PyPI, install the published package with the ONS TUI extra:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># pip install &quot;macrotrace[ons-tui]&quot;</span>
@@ -2006,10 +2065,7 @@ the top-level <code>macrotrace</code> command:</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>uv<span class="w"> </span>run<span class="w"> </span>macrotrace<span class="w"> </span>ons<span class="w"> </span>tui
 </code></pre></div>
 <h3 id="standalone-clis">Standalone CLIs</h3>
-<p>Installing <code>macrotrace</code> also registers two standalone entry points that
-are equivalent to running the nested commands above. They are
-convenient when you want to drop the <code>macrotrace ons</code> prefix or wire
-the explorer into shell scripts:</p>
+<p>Installing <code>macrotrace</code> also registers two standalone entry points that are equivalent to running the nested commands above. They are convenient when you want to drop the <code>macrotrace ons</code> prefix or wire the explorer into shell scripts:</p>
 <table>
 <thead>
 <tr>
@@ -2028,8 +2084,7 @@ the explorer into shell scripts:</p>
 </tr>
 </tbody>
 </table>
-<p>Both honor the same flags as their nested counterparts (e.g.
-<code>--include-non-time-series</code>, <code>--no-cache</code>).</p>
+<p>Both honor the same flags as their nested counterparts (e.g. <code>--include-non-time-series</code>, <code>--no-cache</code>).</p>
 <h3 id="exploring-datasets-with-the-ons-tui">Exploring Datasets with the ONS TUI</h3>
 <p>In the TUI you can explore datasets, editions, versions, dimensions, and options to build a valid <code>series_key</code> without needing to write the API calls yourself. <strong>Note that initial startup will take some time as the TUI fetches and caches metadata for all datasets.</strong> Subsequent runs will be much faster due to caching.</p>
 <p>The TUI is organized into two tabs. The left-hand tab shows the options for the currently selected location in the dataset hierarchy, while the right-hand tab shows the returned data from the API for that API call. You can navigate using arrow keys and select options with Enter or via the mouse.</p>

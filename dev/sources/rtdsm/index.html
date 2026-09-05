@@ -14,7 +14,7 @@
         <link rel="prev" href="../ons/">
       
       
-        <link rel="next" href="../custom/">
+        <link rel="next" href="../wdi/">
       
       
         
@@ -551,6 +551,8 @@
       
         
       
+        
+      
     
     
     
@@ -860,6 +862,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wdi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WDI Archives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1524,6 +1554,8 @@
       
         
       
+        
+      
     
     
     
@@ -1667,6 +1699,34 @@
     
   
     RTDSM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sources/wdi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WDI Archives
   
 
     
@@ -2121,24 +2181,28 @@
 <p>RTDSM spreadsheets are refreshed only at the beginning of each month, so MacroTrace will not re-download a series from the Philadelphia Fed more than once per calendar month. After the first load in a month, subsequent loads of the same series are served from the local request cache without contacting the provider's website, no matter how many times you load it. At the start of the next month the file is fetched again.</p>
 <p>This behavior relies on the request cache, which is enabled by default. If you need to force a fresh download within the same month, delete the request cache file (<code>MacroTraceRequestCache.sqlite</code> by default, or the path given by the <code>MACROTRACE_CACHE</code> environment variable).</p>
 <h2 id="saving-the-source-spreadsheets-optional">Saving the Source Spreadsheets (Optional)</h2>
-<p>If you want to keep a copy of the downloaded Excel files, use the <code>RTDSMUpdateManager</code> directly with an <code>excel_dir</code>. It ingests the data into the database (and writes the spreadsheet to <code>excel_dir</code>); you can then read the series back through <code>MTTimeSeries</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace.sources.rtdsm</span><span class="w"> </span><span class="kn">import</span> <span class="n">RTDSMUpdateManager</span>
+<p>If you want to keep a copy of the downloaded Excel files, use the RTDSM source adapter to construct an update manager with an <code>excel_dir</code>. It ingests the data into the database, writes the spreadsheet to <code>excel_dir</code>, and lets you read the series back through <code>MTTimeSeries</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace.sources.rtdsm</span><span class="w"> </span><span class="kn">import</span> <span class="n">RTDSM_SOURCE_ADAPTER</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">macrotrace</span><span class="w"> </span><span class="kn">import</span> <span class="n">MTTimeSeries</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Download, save the spreadsheet, and store every vintage</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">RTDSMUpdateManager</span><span class="p">(</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">excel_dir</span><span class="o">=</span><span class="s2">&quot;./rtdsm_files&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">()</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># Read the stored data back without re-fetching</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">routput</span> <span class="o">=</span> <span class="n">MTTimeSeries</span><span class="p">(</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">update_prior_to_load</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">series_key</span> <span class="o">=</span> <span class="n">RTDSM_SOURCE_ADAPTER</span><span class="o">.</span><span class="n">normalize_series_key</span><span class="p">(</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">RTDSM_SOURCE_ADAPTER</span><span class="o">.</span><span class="n">create_update_manager</span><span class="p">(</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">series_key</span><span class="o">=</span><span class="n">series_key</span><span class="p">,</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">excel_dir</span><span class="o">=</span><span class="s2">&quot;./rtdsm_files&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">()</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># Read the stored data back without re-fetching</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">routput</span> <span class="o">=</span> <span class="n">MTTimeSeries</span><span class="p">(</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">dataset_id</span><span class="o">=</span><span class="s2">&quot;ROUTPUT&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;RTDSM&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">series_key</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="s2">&quot;Q&quot;</span><span class="p">},</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="n">update_prior_to_load</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">)</span>
 </code></pre></div>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <h3 id="unknown-series">Unknown series</h3>
