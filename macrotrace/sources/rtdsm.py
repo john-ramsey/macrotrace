@@ -66,6 +66,7 @@ from macrotrace.sources.base import (
     ObservationManager,
     ReleaseManager,
     SeriesManager,
+    SourceAdapter,
     UpdateManager,
     UpdateState,
 )
@@ -668,20 +669,17 @@ class RTDSMAPIClient(APIClient):
                 server returns an HTML error page with HTTP 200 for missing
                 files, so content is validated by its zip magic bytes).
         """
-        url = self.base_url + self.filename
-        headers = {"User-Agent": self.user_agent}
         logger.info(f"Downloading RTDSM file: {self.filename}")
 
+        request_kwargs = {}
         if isinstance(self.session, requests_cache.CachedSession):
             # Expire the cached copy at the start of next month so repeated
             # loads within a month never re-request the provider's server.
             expire_at = _first_of_next_month(datetime.now(UTC))
-            response = self.session.get(url, headers=headers, expire_after=expire_at)
-        else:
-            response = self.session.get(url, headers=headers)
+            request_kwargs["expire_after"] = expire_at
 
+        response = self._make_response(self.filename, **request_kwargs)
         is_cached = getattr(response, "from_cache", False)
-        response.raise_for_status()
         content = response.content
         logger.debug(
             f"RTDSM download {self.filename}: status={response.status_code}, "
@@ -944,8 +942,6 @@ class RTDSMObservationManager(ObservationManager):
 
 
 class RTDSMUpdateManager(UpdateManager):
-    NATIVE_OBSERVATION_TZ = UTC
-
     def __init__(
         self,
         dataset_id: str,
@@ -964,10 +960,9 @@ class RTDSMUpdateManager(UpdateManager):
         Args:
             dataset_id: The series identifier (e.g. "ROUTPUT"); case-insensitive.
             source: The source name; defaults to "RTDSM".
-            series_key: Optionally ``{"frequency": "Q"}`` or ``{"frequency":
-                "M"}`` to select the vintage frequency. If omitted, defaults to
-                the series' only vintage frequency, or quarterly when both are
-                offered.
+            series_key: Normalized ``{"frequency": "Q"}`` or
+                ``{"frequency": "M"}`` selection supplied by the RTDSM source
+                adapter.
             release_start_date: Optional lower bound on vintage dates to load.
             release_end_date: Optional upper bound on vintage dates to load.
             db_path: Optional path to the SQLite database.
@@ -977,10 +972,8 @@ class RTDSMUpdateManager(UpdateManager):
                 spreadsheet. If None, the file is parsed in memory and not kept.
 
         Raises:
-            ValueError: If ``dataset_id`` is not a known RTDSM series, or if the
-                requested vintage frequency is not offered by that series. The
-                catalog is bundled, so an unknown series fails fast here rather
-                than at fetch time.
+            ValueError: If ``dataset_id`` is not a known RTDSM series or the
+                normalized frequency selection is missing.
         """
         dataset_id = dataset_id.upper()
         self.dataset_id = dataset_id
@@ -994,11 +987,14 @@ class RTDSMUpdateManager(UpdateManager):
                 f"{len(RTDSM_CATALOG)} supported series identifiers."
             )
 
-        requested = series_key.get("frequency") if series_key else None
-        self.vintage_freq = _resolve_vintage_freq(dataset_id, info, requested)
+        if series_key is None or "frequency" not in series_key:
+            raise ValueError(
+                "RTDSMUpdateManager requires a normalized frequency series key. "
+                "Use RTDSM_SOURCE_ADAPTER to construct update managers."
+            )
+        self.vintage_freq = series_key["frequency"]
         self.data_freq = info.data_freq
         self.filename = _build_filename(dataset_id, self.vintage_freq, info.data_freq)
-        resolved_series_key = {"frequency": self.vintage_freq}
         logger.debug(
             f"Initializing RTDSMUpdateManager for {dataset_id} "
             f"(vintage_freq={self.vintage_freq}, file={self.filename})"
@@ -1007,7 +1003,7 @@ class RTDSMUpdateManager(UpdateManager):
         super().__init__(
             dataset_id=dataset_id,
             source=source,
-            series_key=resolved_series_key,
+            series_key=series_key,
             release_start_date=release_start_date,
             release_end_date=release_end_date,
             db_path=db_path,
@@ -1040,3 +1036,52 @@ class RTDSMUpdateManager(UpdateManager):
 
     def _create_observation_manager(self) -> ObservationManager:
         return RTDSMObservationManager(self.api_client)
+
+
+class RTDSMSourceAdapter(SourceAdapter):
+    """Provide RTDSM catalogue selection and updater construction."""
+
+    source = RTDSM_SOURCE
+    native_observation_timezone = UTC
+
+    def normalize_series_key(
+        self,
+        dataset_id: str,
+        series_key: Optional[Dict[str, str]],
+    ) -> Dict[str, str]:
+        normalized = super().normalize_series_key(dataset_id, series_key)
+        dataset_id = dataset_id.upper()
+        info = RTDSM_CATALOG.get(dataset_id)
+        if info is None:
+            raise ValueError(
+                f"Unknown RTDSM series {dataset_id!r}. See "
+                f"macrotrace.sources.rtdsm.RTDSM_CATALOG for the "
+                f"{len(RTDSM_CATALOG)} supported series identifiers."
+            )
+        requested = normalized.get("frequency")
+        return {"frequency": _resolve_vintage_freq(dataset_id, info, requested)}
+
+    def create_update_manager(
+        self,
+        dataset_id: str,
+        series_key: Dict[str, str],
+        release_start_date: Optional[datetime] = None,
+        release_end_date: Optional[datetime] = None,
+        db_path: Optional[str] = None,
+        cache_settings: Optional[Dict[str, Any]] = None,
+        cache_path: Optional[str] = None,
+        excel_dir: Optional[str] = None,
+    ) -> RTDSMUpdateManager:
+        return RTDSMUpdateManager(
+            dataset_id=dataset_id,
+            series_key=series_key,
+            release_start_date=release_start_date,
+            release_end_date=release_end_date,
+            db_path=db_path,
+            cache_settings=cache_settings,
+            cache_path=cache_path,
+            excel_dir=excel_dir,
+        )
+
+
+RTDSM_SOURCE_ADAPTER = RTDSMSourceAdapter()

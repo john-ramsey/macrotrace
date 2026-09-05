@@ -98,16 +98,20 @@ This behavior relies on the request cache, which is enabled by default. If you n
 
 ## Saving the Source Spreadsheets (Optional)
 
-If you want to keep a copy of the downloaded Excel files, use the `RTDSMUpdateManager` directly with an `excel_dir`. It ingests the data into the database (and writes the spreadsheet to `excel_dir`); you can then read the series back through `MTTimeSeries`:
+If you want to keep a copy of the downloaded Excel files, use the RTDSM source adapter to construct an update manager with an `excel_dir`. It ingests the data into the database, writes the spreadsheet to `excel_dir`, and lets you read the series back through `MTTimeSeries`:
 
 ```python
-from macrotrace.sources.rtdsm import RTDSMUpdateManager
+from macrotrace.sources.rtdsm import RTDSM_SOURCE_ADAPTER
 from macrotrace import MTTimeSeries
 
 # Download, save the spreadsheet, and store every vintage
-RTDSMUpdateManager(
+series_key = RTDSM_SOURCE_ADAPTER.normalize_series_key(
+    "ROUTPUT",
+    {"frequency": "Q"},
+)
+RTDSM_SOURCE_ADAPTER.create_update_manager(
     dataset_id="ROUTPUT",
-    series_key={"frequency": "Q"},
+    series_key=series_key,
     excel_dir="./rtdsm_files",
 ).update()
 

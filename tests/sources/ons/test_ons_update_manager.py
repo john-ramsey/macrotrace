@@ -1,11 +1,11 @@
 from macrotrace.sources.ons import (
-    ONSUpdateManager,
     ONSAPIClient,
     ONSDatasetManager,
     ONSObservationManager,
     ONSReleaseManager,
     ONSSeriesManager,
     ONS_SOURCE,
+    ONS_SOURCE_ADAPTER,
 )
 
 
@@ -15,8 +15,10 @@ def test_initialization():
     release_start_date = "2020-01-01"
     release_end_date = "2020-12-31"
 
-    um = ONSUpdateManager(
+    series_key = ONS_SOURCE_ADAPTER.normalize_series_key(dataset_id, None)
+    um = ONS_SOURCE_ADAPTER.create_update_manager(
         dataset_id=dataset_id,
+        series_key=series_key,
         release_start_date=release_start_date,
         release_end_date=release_end_date,
     )

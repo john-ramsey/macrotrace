@@ -6,20 +6,15 @@
 [![CI](https://github.com/john-ramsey/macrotrace/actions/workflows/ci.yml/badge.svg)](https://github.com/john-ramsey/macrotrace/actions/workflows/ci.yml)
 [![Docs](https://github.com/john-ramsey/macrotrace/actions/workflows/docs.yml/badge.svg)](https://john-ramsey.github.io/macrotrace/)
 
-MacroTrace is a Python library for collecting, storing, and analyzing macroeconomic
-time-series vintages. It is designed for research workflows where the revision
-history matters just as much as the latest published value.
+MacroTrace is a Python library for collecting, storing, and analyzing macroeconomic time-series vintages. It is designed for research workflows where the revision history matters just as much as the latest published value.
 
 **Documentation:** <https://john-ramsey.github.io/macrotrace/>
 
-Instead of treating a series as a single final dataset, MacroTrace helps you work
-with the sequence of releases that were available in real time. This makes it
-easier to study data revisions, reproduce historical analyses, and compare what was
-known at different publication dates.
+Instead of treating a series as a single final dataset, MacroTrace helps you work with the sequence of releases that were available in real time. This makes it easier to study data revisions, reproduce historical analyses, and compare what was known at different publication dates.
 
 ## Features
 
-- Fetch vintage-aware macroeconomic time series from FRED, ONS, and the Philadelphia Fed's Real-Time Data Set (RTDSM)
+- Fetch vintage-aware macroeconomic time series from FRED, ONS, the Philadelphia Fed's Real-Time Data Set (RTDSM), and historical World Development Indicators (WDI) editions
 - Store releases locally in SQLite for reproducible, offline-friendly workflows
 - Retrieve series as they were known on a specific date with `as_of(...)`
 - Filter both vintage windows and data windows when loading a series
@@ -68,12 +63,9 @@ july_2020 = payems.as_of("2020-07-15")
 df = july_2020.to_dataframe()
 ```
 
-MacroTrace stores fetched releases in a local SQLite database named
-`MacroTrace.db`, making repeated loads faster and keeping vintage histories
-available for later analysis.
+MacroTrace stores fetched releases in a local SQLite database named `MacroTrace.db`, making repeated loads faster and keeping vintage histories available for later analysis.
 
-For multi-dimensional datasets such as ONS releases, provide a `series_key` to
-select a specific slice of the dataset:
+For multi-dimensional datasets such as ONS releases, provide a `series_key` to select a specific slice of the dataset:
 
 ```python
 from macrotrace import MTTimeSeries
@@ -88,9 +80,7 @@ gdp = MTTimeSeries(
 )
 ```
 
-The Philadelphia Fed's Real-Time Data Set (RTDSM) needs no API key. Use the
-series mnemonic as the `dataset_id` and select the vintage frequency with the
-`series_key`:
+The Philadelphia Fed's Real-Time Data Set (RTDSM) needs no API key. Use the series mnemonic as the `dataset_id` and select the vintage frequency with the `series_key`:
 
 ```python
 from macrotrace import MTTimeSeries
@@ -102,15 +92,27 @@ routput = MTTimeSeries(
 )
 ```
 
-See the [RTDSM source guide](docs/sources/rtdsm.md) for the full list of series
-and details on vintage frequencies.
+See the [RTDSM source guide](docs/sources/rtdsm.md) for the full list of series and details on vintage frequencies.
+
+Historical World Development Indicators editions are public and need no API key. Use a WDI indicator code and select one World Bank entity with the `series_key`:
+
+```python
+from macrotrace import MTTimeSeries
+
+gdp_per_capita = MTTimeSeries(
+    dataset_id="NY.GDP.PCAP.KD",
+    source="WDI",
+    series_key={"country": "USA"},
+    vintage_start_date="2014-04-01",
+    vintage_end_date="2014-07-31",
+)
+```
+
+See the [WDI archive guide](docs/sources/wdi.md) for exact edition retrieval, month-precision semantics, bulk panels, and cache behavior.
 
 ### Identifying an Unknown Vintage
 
-If you have a block of observations with no release date attached — for
-example, a series lifted from a replication package — `identify_vintage`
-compares it against every stored vintage and reports which release(s) it is
-consistent with:
+If you have a block of observations with no release date attached — for example, a series lifted from a replication package — `identify_vintage` compares it against every stored vintage and reports which release(s) it is consistent with:
 
 ```python
 from macrotrace import MTTimeSeries
@@ -148,8 +150,7 @@ macrotrace ons tui
 
 ## Development
 
-For local development, we use `uv` for dependency management and environment
-execution.
+For local development, we use `uv` for dependency management and environment execution.
 
 Install the project with the development, docs, and optional TUI dependencies:
 
@@ -171,10 +172,8 @@ uv run black .
 
 ## Project Status
 
-MacroTrace is under active development as part of a PhD research project on
-macroeconomic data revisions.
+MacroTrace is under active development as part of a PhD research project on macroeconomic data revisions.
 
 ## License
 
-MacroTrace is licensed under the GNU General Public License v3.0 or later
-(`GPL-3.0-or-later`).
+MacroTrace is licensed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`).

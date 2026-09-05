@@ -6,6 +6,12 @@ The base source class is a foundation for building specific data source integrat
 
 ## Base Classes
 
+### SourceAdapter
+
+::: macrotrace.sources.base.SourceAdapter
+
+`MTTimeSeries` always resolves a lightweight source adapter. The adapter normalizes source identity and declares timestamp semantics without opening an API client or request cache. Its update-manager factory is called only when `update_prior_to_load=True`.
+
 ### UpdateState
 
 ::: macrotrace.sources.base.UpdateState

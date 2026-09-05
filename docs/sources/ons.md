@@ -49,8 +49,7 @@ Dataset: regional-gdp-by-quarter
 
 Currently, the ONS does not provide an easy UI to assemble series keys. In the API's current state, you must explore the dataset metadata via API to find the relevant dimensions and options, then construct their `series_key` manually. The optional ONS TUI provides an interactive way to browse datasets, editions, versions, dimensions, and options to build a valid `series_key` without needing to read through API documentation.
 
-If Macrotrace is installed in your environment with the ONS TUI extra, you can run the ONS tools through
-the top-level `macrotrace` command:
+If Macrotrace is installed in your environment with the ONS TUI extra, you can run the ONS tools through the top-level `macrotrace` command:
 
 Examples:
 
@@ -76,18 +75,14 @@ uv run macrotrace ons tui
 
 ### Standalone CLIs
 
-Installing `macrotrace` also registers two standalone entry points that
-are equivalent to running the nested commands above. They are
-convenient when you want to drop the `macrotrace ons` prefix or wire
-the explorer into shell scripts:
+Installing `macrotrace` also registers two standalone entry points that are equivalent to running the nested commands above. They are convenient when you want to drop the `macrotrace ons` prefix or wire the explorer into shell scripts:
 
 | Entry point                     | Equivalent to               |
 |---------------------------------|-----------------------------|
 | `macrotrace-ons-explorer`       | `macrotrace ons explorer`   |
 | `macrotrace-ons-explorer-tui`   | `macrotrace ons tui`        |
 
-Both honor the same flags as their nested counterparts (e.g.
-`--include-non-time-series`, `--no-cache`).
+Both honor the same flags as their nested counterparts (e.g. `--include-non-time-series`, `--no-cache`).
 
 ### Exploring Datasets with the ONS TUI
 

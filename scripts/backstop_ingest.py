@@ -124,6 +124,21 @@ RTDSM_SOURCES: Dict[str, Dict[str, object]] = {
     },
 }
 
+WDI_SOURCES: Dict[str, Dict[str, object]] = {
+    "usa_real_gdp_per_capita_constant_usd": {
+        "dataset_id": "NY.GDP.PCAP.KD",
+        "series_key": {"country": "USA"},
+    },
+    "usa_real_gdp_per_capita_constant_lcu": {
+        "dataset_id": "NY.GDP.PCAP.KN",
+        "series_key": {"country": "USA"},
+    },
+    "usa_total_population": {
+        "dataset_id": "SP.POP.TOTL",
+        "series_key": {"country": "USA"},
+    },
+}
+
 
 @dataclass
 class IngestResult:
@@ -243,7 +258,10 @@ def _ingest_one(
 
 def _build_cli() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run external ingest backstop (FRED + ONS + RTDSM) via MTTimeSeries."
+        description=(
+            "Run external ingest backstop (FRED + ONS + RTDSM + WDI) via "
+            "MTTimeSeries."
+        )
     )
     parser.add_argument(
         "--vintage-start-date",
@@ -374,6 +392,33 @@ def main() -> int:
         results.append(result)
         LOGGER.info(
             "RTDSM %s: %s (vintages=%d, latest_obs=%d, %.2fs)",
+            result.status,
+            source_name,
+            result.vintages_available,
+            result.latest_observation_count,
+            result.duration_seconds,
+        )
+
+    LOGGER.info("Starting WDI ingest (%d sources)", len(WDI_SOURCES))
+    for source_name, config in WDI_SOURCES.items():
+        dataset_id = str(config["dataset_id"])
+        series_key = config.get("series_key")
+        if not isinstance(series_key, dict):
+            raise ValueError(
+                f"WDI source '{source_name}' must define a dict series_key."
+            )
+
+        LOGGER.info("WDI start: %s (%s)", source_name, dataset_id)
+        result = _ingest_one(
+            source="wdi",
+            source_name=source_name,
+            dataset_id=dataset_id,
+            series_key=series_key,  # type: ignore[arg-type]
+            vintage_start_date=vintage_start_date,
+        )
+        results.append(result)
+        LOGGER.info(
+            "WDI %s: %s (vintages=%d, latest_obs=%d, %.2fs)",
             result.status,
             source_name,
             result.vintages_available,

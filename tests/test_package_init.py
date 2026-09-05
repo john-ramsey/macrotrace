@@ -1,4 +1,6 @@
 import importlib
+import subprocess
+import sys
 
 import pytest
 
@@ -35,6 +37,17 @@ def test_package_reload_keeps_lazy_protocol():
     """Reloading the package preserves the lazy-import contract."""
     importlib.reload(macrotrace)
     assert macrotrace.MTTimeSeries is not None
+
+
+def test_wdi_source_can_be_imported_before_models():
+    """Import WDI successfully in a fresh interpreter before model imports."""
+    result = subprocess.run(
+        [sys.executable, "-c", "from macrotrace.sources.wdi import WDI_SOURCE_ADAPTER"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_sources_create_and_drop_tables_delegate():

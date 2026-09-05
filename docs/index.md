@@ -33,6 +33,7 @@ Automated collection from major economic data providers:
 - **[FRED](sources/fred.md)** (Federal Reserve Economic Data)
 - **[ONS](sources/ons.md)** (Office for National Statistics)
 - **[RTDSM](sources/rtdsm.md)** (Real-Time Data Set for Macroeconomists)
+- **[WDI Archives](sources/wdi.md)** (historical World Development Indicators editions)
 
 ### Revision Tracking
 Maintain complete history of how each data point changes across releases, enabling analysis of:

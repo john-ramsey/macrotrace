@@ -1,8 +1,18 @@
+"""UK Office for National Statistics (ONS) source support.
+
+The integration treats ONS time-series dataset versions as releases and uses
+``series_key`` dimension filters to select observations. It preserves dataset
+and release dimension metadata in MacroTrace's standard storage model and
+accesses the public ONS API without credentials.
+"""
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import pytz
+import requests
 
 from tenacity import (
+    before_sleep_log,
     retry,
     stop_after_attempt,
     wait_fixed,
@@ -26,6 +36,7 @@ from macrotrace.sources.base import (
     ReleaseManager,
     SeriesManager,
     ObservationManager,
+    SourceAdapter,
 )
 
 import logging
@@ -90,6 +101,8 @@ def _retry_after_seconds(exc: BaseException) -> Optional[float]:
     Handles Retry-After as delta-seconds.
     """
     resp = getattr(exc, "response", None)
+    if resp is None:
+        return None
 
     ra = resp.headers.get("Retry-After")
     if not ra:
@@ -116,6 +129,16 @@ def wait_retry_after_or_fallback(retry_state) -> float:
 def is_429(exc: BaseException) -> bool:
     resp = getattr(exc, "response", None)
     return resp is not None and resp.status_code == 429
+
+
+def is_retryable_ons_error(exc: BaseException) -> bool:
+    """Return whether an ONS request failure is transient."""
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    if not isinstance(exc, requests.HTTPError) or exc.response is None:
+        return False
+    status_code = exc.response.status_code
+    return status_code == 429 or 500 <= status_code < 600
 
 
 def year_quarter_to_ymd(s):
@@ -157,20 +180,17 @@ class ONSAPIClient(APIClient):
         """
         return {}
 
-    # Add an additional retry layer to handle 429 responses
-    # This is needed because ONS API rate limits are strict due to them not using API keys
-    # The Retry-After header is respected if provided
     @retry(
-        stop=stop_after_attempt(1),
+        stop=stop_after_attempt(4),
         wait=wait_retry_after_or_fallback,
-        retry=retry_if_exception(is_429),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        retry=retry_if_exception(is_retryable_ons_error),
         reraise=True,
     )
     def make_request(
         self, endpoint: str, params: Dict[str, Any] = {}
     ) -> Dict[str, Any]:
-        # Call parent's make_request with retry logic for 429 responses
-        return super().make_request(endpoint=endpoint, params=params)
+        return self._make_response(endpoint, params).json()
 
     def make_paginated_request(
         self,
@@ -954,6 +974,71 @@ class ONSObservationManager(ObservationManager):
         """
         return {"time": "*"} | state.series_key
 
+    @staticmethod
+    def _request_already_recorded(release: Release, series_key: Dict[str, Any]) -> bool:
+        """Return whether an observation request completed for this series."""
+        metadata = release.additional_metadata or {}
+        return any(
+            request.get("series_key") == series_key
+            and request.get("time_selection") == "*"
+            for request in metadata.get("observation_requests", [])
+            if isinstance(request, dict)
+        )
+
+    @staticmethod
+    def _series_has_observations(release: Release, series: Series) -> bool:
+        """Return whether this release already has observations for the series."""
+        return (
+            Observation.select()
+            .where((Observation.release == release) & (Observation.series == series))
+            .exists()
+        )
+
+    def _releases_to_fetch(self, state: UpdateState) -> List[Release]:
+        """Return releases not yet populated for the selected ONS series."""
+        if state.dataset is None or state.series is None or state.series_key is None:
+            raise ValueError(
+                "ONS dataset, series, and series key must be initialized before "
+                "fetching observations."
+            )
+
+        conditions = [Release.dataset == state.dataset]
+        if state.release_start_date:
+            conditions.append(Release.release_date >= state.release_start_date)
+        if state.release_end_date:
+            conditions.append(Release.release_date <= state.release_end_date)
+
+        releases = Release.select().where(*conditions).order_by(Release.release_date)
+
+        # Example: This ensures we can pull observations for series key {"foo": "bar"}
+        # when series key {"foo": "abc"} has already been pulled on the dataset
+        return [
+            release
+            for release in releases
+            if not self._series_has_observations(release, state.series)
+            and not self._request_already_recorded(release, state.series_key)
+        ]
+
+    @staticmethod
+    def _record_completed_request(
+        release: Release,
+        series_key: Dict[str, Any],
+        observation_count: int,
+    ) -> None:
+        """Record a completed request, including a valid empty response."""
+        metadata = dict(release.additional_metadata or {})
+        requests_metadata = list(metadata.get("observation_requests", []))
+        requests_metadata.append(
+            {
+                "series_key": dict(series_key),
+                "time_selection": "*",
+                "observation_count": observation_count,
+            }
+        )
+        metadata["observation_requests"] = requests_metadata
+        release.additional_metadata = metadata
+        release.save(only=[Release.additional_metadata])
+
     def _parse_observation_timestamp(self, time_label: str, freq: str) -> datetime:
         """
         Parse the observation timestamp from the ONS time label.
@@ -1080,22 +1165,29 @@ class ONSObservationManager(ObservationManager):
         Returns:
             List[Observation]: A list of new observations.
         """
-        logger.info(
-            f"Fetching ONS observations for {len(state.new_releases)} release(s)"
-        )
+        if state.series_key is None:
+            raise ValueError(
+                "ONS series key must be initialized before fetching observations."
+            )
+        series_key = state.series_key
+        releases = self._releases_to_fetch(state)
+        logger.info(f"Fetching ONS observations for {len(releases)} release(s)")
         new_observations = []
 
-        for release in state.new_releases:
+        for release in releases:
             release_observations = self._fetch_observations_for_release(state, release)
             new_observations.extend(release_observations)
+            self._record_completed_request(
+                release,
+                series_key,
+                len(release_observations),
+            )
 
         logger.info(f"Created {len(new_observations)} new ONS observation(s)")
         return new_observations
 
 
 class ONSUpdateManager(UpdateManager):
-    NATIVE_OBSERVATION_TZ = UTC
-
     def __init__(
         self,
         dataset_id: str,
@@ -1138,3 +1230,33 @@ class ONSUpdateManager(UpdateManager):
 
     def _create_observation_manager(self) -> ObservationManager:
         return ONSObservationManager(self.api_client)
+
+
+class ONSSourceAdapter(SourceAdapter):
+    """Provide lightweight ONS behavior and updater construction."""
+
+    source = ONS_SOURCE
+    native_observation_timezone = UTC
+
+    def create_update_manager(
+        self,
+        dataset_id: str,
+        series_key: Dict[str, str],
+        release_start_date: Optional[datetime] = None,
+        release_end_date: Optional[datetime] = None,
+        db_path: Optional[str] = None,
+        cache_settings: Optional[Dict[str, Any]] = None,
+        cache_path: Optional[str] = None,
+    ) -> ONSUpdateManager:
+        return ONSUpdateManager(
+            dataset_id=dataset_id,
+            series_key=series_key,
+            release_start_date=release_start_date,
+            release_end_date=release_end_date,
+            db_path=db_path,
+            cache_settings=cache_settings,
+            cache_path=cache_path,
+        )
+
+
+ONS_SOURCE_ADAPTER = ONSSourceAdapter()

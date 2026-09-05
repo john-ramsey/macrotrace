@@ -273,6 +273,137 @@ def test_fetch_observations_for_release_response_none(
 
 
 @patch("macrotrace.sources.ons.ONSObservationManager._fetch_observations_for_release")
+def test_fetch_new_observations_backfills_existing_release_for_new_series(
+    mock_fetch_observations_for_release, api_client, empty_state
+):
+    """Fetch an existing dataset release when the selected series is new."""
+    dataset = Dataset.create(dataset_id="example-dataset", source="ONS")
+    release = Release.create(
+        dataset=dataset,
+        release_date=datetime(2025, 1, 1, tzinfo=UTC),
+        additional_metadata={
+            "dimensions": [
+                {"name": "geography"},
+                {"name": "industry"},
+                {"name": "time"},
+            ],
+            "version": "release-jan",
+        },
+    )
+    first_series = Series.create(
+        dataset=dataset,
+        series_key={"geography": "UK", "industry": "A--T"},
+    )
+    Observation.create(
+        series=first_series,
+        release=release,
+        observation_timestamp=datetime(2024, 12, 1, tzinfo=UTC),
+        value=100.0,
+    )
+    second_series = Series.create(
+        dataset=dataset,
+        series_key={"geography": "UK", "industry": "C"},
+    )
+    empty_state.dataset = dataset
+    empty_state.dataset_id = dataset.dataset_id
+    empty_state.series = second_series
+    empty_state.series_key = second_series.series_key
+    empty_state.new_releases = []
+    expected = Observation(
+        series=second_series,
+        release=release,
+        observation_timestamp=datetime(2024, 12, 1, tzinfo=UTC),
+        value=90.0,
+    )
+    mock_fetch_observations_for_release.return_value = [expected]
+
+    observations = ONSObservationManager(api_client).fetch_new_observations(empty_state)
+
+    assert observations == [expected]
+    mock_fetch_observations_for_release.assert_called_once_with(empty_state, release)
+
+
+@patch("macrotrace.sources.ons.ONSObservationManager._fetch_observations_for_release")
+def test_fetch_new_observations_skips_existing_series_release(
+    mock_fetch_observations_for_release, api_client, empty_state
+):
+    """Do not refetch a release that already contains series observations."""
+    dataset = Dataset.create(dataset_id="example-dataset", source="ONS")
+    release = Release.create(
+        dataset=dataset,
+        release_date=datetime(2025, 1, 1, tzinfo=UTC),
+        additional_metadata={"dimensions": [], "version": "release-jan"},
+    )
+    series = Series.create(
+        dataset=dataset,
+        series_key={"geography": "UK", "industry": "C"},
+    )
+    Observation.create(
+        series=series,
+        release=release,
+        observation_timestamp=datetime(2024, 12, 1, tzinfo=UTC),
+        value=90.0,
+    )
+    empty_state.dataset = dataset
+    empty_state.series = series
+    empty_state.series_key = series.series_key
+
+    observations = ONSObservationManager(api_client).fetch_new_observations(empty_state)
+
+    assert observations == []
+    mock_fetch_observations_for_release.assert_not_called()
+
+
+@patch("macrotrace.sources.ons.ONSAPIClient.make_request")
+def test_fetch_new_observations_records_empty_response(
+    mock_make_request, api_client, empty_state
+):
+    """Record a valid empty response so a repeated update does not refetch it."""
+    dataset = Dataset.create(dataset_id="example-dataset", source="ONS")
+    release = Release.create(
+        dataset=dataset,
+        release_date=datetime(2025, 1, 1, tzinfo=UTC),
+        additional_metadata={
+            "dimensions": [
+                {"name": "geography"},
+                {"name": "industry"},
+                {"name": "time", "id": "mmm-yy"},
+            ],
+            "version": "release-jan",
+        },
+    )
+    series = Series.create(
+        dataset=dataset,
+        series_key={"geography": "UK", "industry": "C"},
+    )
+    empty_state.dataset = dataset
+    empty_state.dataset_id = dataset.dataset_id
+    empty_state.series = series
+    empty_state.series_key = series.series_key
+    mock_make_request.return_value = {"observations": None}
+    manager = ONSObservationManager(api_client)
+
+    assert manager.fetch_new_observations(empty_state) == []
+    assert manager.fetch_new_observations(empty_state) == []
+
+    mock_make_request.assert_called_once_with(
+        endpoint=(
+            "datasets/example-dataset/editions/time-series/versions/"
+            "release-jan/observations"
+        ),
+        params={"time": "*", "geography": "UK", "industry": "C"},
+    )
+    release = Release.get_by_id(release.id)
+    assert release.additional_metadata["observation_requests"] == [
+        {
+            "series_key": {"geography": "UK", "industry": "C"},
+            "time_selection": "*",
+            "observation_count": 0,
+        }
+    ]
+
+
+@patch("macrotrace.sources.ons.ONSObservationManager._fetch_observations_for_release")
 def test_fetch_new_observations(
     mock_fetch_observations_for_release, api_client, empty_state
 ):

@@ -1720,10 +1720,12 @@ def test_identify_vintage_hint_never_counts_as_match(sample_time_series):
     assert result.release_date is None
 
 
-def test_source_managers_declare_native_observation_timezone():
-    """Every registered source manager declares the timezone it stamps observations with."""
-    for name, manager in MTTimeSeries._source_manager_classes().items():
-        assert getattr(manager, "NATIVE_OBSERVATION_TZ", None) is not None, name
+def test_source_adapters_declare_native_observation_timezone():
+    """Every supported source adapter declares its observation timezone."""
+    from macrotrace.models.mt.time_series import _source_adapters
+
+    for name, adapter in _source_adapters().items():
+        assert adapter.native_observation_timezone is not None, name
 
 
 def test_identify_vintage_require_exact_coverage(sample_time_series):

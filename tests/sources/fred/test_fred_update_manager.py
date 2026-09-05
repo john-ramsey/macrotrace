@@ -1,13 +1,13 @@
 import pytest
 import os
 from macrotrace.sources.fred import (
-    FredUpdateManager,
     FredAPIClient,
     FredDatasetManager,
     FredObservationManager,
     FredReleaseManager,
     FredSeriesManager,
     FRED_SOURCE,
+    FRED_SOURCE_ADAPTER,
 )
 
 
@@ -19,8 +19,10 @@ def test_initialization():
 
     os.environ["FRED_API_KEY"] = "test_api_key"
 
-    um = FredUpdateManager(
+    series_key = FRED_SOURCE_ADAPTER.normalize_series_key(dataset_id, None)
+    um = FRED_SOURCE_ADAPTER.create_update_manager(
         dataset_id=dataset_id,
+        series_key=series_key,
         release_start_date=release_start_date,
         release_end_date=release_end_date,
     )
@@ -43,10 +45,7 @@ def test_series_key_warning(caplog):
     series_key = {"not used": "NOT_USED"}
     os.environ["FRED_API_KEY"] = "test_api_key"
 
-    um = FredUpdateManager(
-        dataset_id=dataset_id,
-        series_key=series_key,
-    )
+    assert FRED_SOURCE_ADAPTER.normalize_series_key(dataset_id, series_key) == {}
 
     assert "FRED series do not have series keys" in caplog.text
 
@@ -62,4 +61,4 @@ def test_missing_api_key_raises():
         EnvironmentError,
         match="FRED API key is required to use the FRED API client. Please provide one with the 'FRED_API_KEY' environment variable.",
     ):
-        FredUpdateManager(dataset_id=dataset_id)
+        FRED_SOURCE_ADAPTER.create_update_manager(dataset_id, {})

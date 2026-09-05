@@ -1,18 +1,24 @@
 import pytest
 
 from macrotrace.sources.rtdsm import (
-    RTDSMUpdateManager,
     RTDSMAPIClient,
     RTDSMDatasetManager,
     RTDSMReleaseManager,
     RTDSMSeriesManager,
     RTDSMObservationManager,
     RTDSM_SOURCE,
+    RTDSM_SOURCE_ADAPTER,
 )
 
 
 def _make(tmp_path, **kwargs):
-    return RTDSMUpdateManager(
+    dataset_id = kwargs.pop("dataset_id")
+    series_key = RTDSM_SOURCE_ADAPTER.normalize_series_key(
+        dataset_id, kwargs.pop("series_key", None)
+    )
+    return RTDSM_SOURCE_ADAPTER.create_update_manager(
+        dataset_id=dataset_id,
+        series_key=series_key,
         db_path=str(tmp_path / "rtdsm.db"),
         cache_settings={"caching": False},
         **kwargs,
@@ -21,7 +27,7 @@ def _make(tmp_path, **kwargs):
 
 def test_initialization(tmp_path):
     """
-    The manager resolves the series, normalizes the key, and wires the
+    The adapter resolves the series and the manager wires the
     component managers.
     """
     um = _make(tmp_path, dataset_id="routput", series_key={"frequency": "Q"})
@@ -77,4 +83,4 @@ def test_unknown_series_raises_at_construction(tmp_path):
 
 def test_unavailable_frequency_raises():
     with pytest.raises(ValueError, match="does not offer M-frequency"):
-        RTDSMUpdateManager(dataset_id="DIV", series_key={"frequency": "M"})
+        RTDSM_SOURCE_ADAPTER.normalize_series_key("DIV", {"frequency": "M"})

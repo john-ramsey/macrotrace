@@ -5,15 +5,18 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from macrotrace.models.db import Observation, Release, Dataset, Series
-from macrotrace.models.mt.time_series import VALID_SOURCES
+from macrotrace.models.mt.time_series import _source_adapters
 from macrotrace.sources.base import UpdateManager
 from tests.models.mt.utils import *
 from macrotrace.models.db import DatasetDimension, SeriesDimensionFilter
 
 
+SUPPORTED_SOURCES = list(_source_adapters())
+
+
 def test_set_valid_source(empty_timeseries):
     """Test that MTTimeSeries._set_source sets valid sources correctly"""
-    for source in VALID_SOURCES:
+    for source in SUPPORTED_SOURCES:
         empty_timeseries._set_source(source)
         assert empty_timeseries.source == source.upper()
 
@@ -40,7 +43,7 @@ def test_clean_date_str(empty_timeseries):
 def test_clean_date_str_fred_source_localizes_to_us_central(empty_timeseries):
     """For a FRED series, a date string lands at midnight US Central — the
     same convention FRED's release dates and observations are stored with."""
-    empty_timeseries.source = "FRED"
+    empty_timeseries._set_source("FRED")
     dt = empty_timeseries._clean_date("2018-03-16")
     assert dt == pytz.timezone("America/Chicago").localize(datetime(2018, 3, 16))
 
@@ -184,7 +187,7 @@ def test_strip_empty_observations_end(empty_timeseries):
 def test_get_observations_for_release(empty_timeseries):
     """Test that the MTTimeSeries._get_observations_for_release() retrieves observations correctly"""
 
-    dataset = Dataset.create(dataset_id="TEST", source=VALID_SOURCES[0])
+    dataset = Dataset.create(dataset_id="TEST", source=SUPPORTED_SOURCES[0])
     release = Release.create(
         dataset=dataset,
         release_date=datetime(2023, 1, 1, tzinfo=UTC),
@@ -219,7 +222,7 @@ def test_get_observations_for_release(empty_timeseries):
 def test_get_observations_for_release_strip_start(empty_timeseries):
     """Test that the MTTimeSeries._get_observations_for_release() strips None values at the start"""
 
-    dataset = Dataset.create(dataset_id="TEST", source=VALID_SOURCES[0])
+    dataset = Dataset.create(dataset_id="TEST", source=SUPPORTED_SOURCES[0])
     release = Release.create(
         dataset=dataset,
         release_date=datetime(2023, 1, 1, tzinfo=UTC),
@@ -253,7 +256,7 @@ def test_get_observations_for_release_strip_start(empty_timeseries):
 def test_get_observations_for_release_strip_end(empty_timeseries):
     """Test that the MTTimeSeries._get_observations_for_release() strips None values at the end"""
 
-    dataset = Dataset.create(dataset_id="TEST", source=VALID_SOURCES[0])
+    dataset = Dataset.create(dataset_id="TEST", source=SUPPORTED_SOURCES[0])
     release = Release.create(
         dataset=dataset,
         release_date=datetime(2023, 1, 1, tzinfo=UTC),
@@ -284,30 +287,29 @@ def test_get_observations_for_release_strip_end(empty_timeseries):
     assert observations[0].value == 100
 
 
-def test_get_update_manager_success(empty_timeseries):
-    """Test that the MTTimeSeries._get_update_manager() returns an UpdateManager instance for each valid source"""
-    valid_sources = VALID_SOURCES.copy()
+def test_source_adapters_create_update_managers(empty_timeseries):
+    """Each updating source adapter creates an UpdateManager."""
+    valid_sources = SUPPORTED_SOURCES.copy()
     valid_sources.remove("USER")  # USER source does not have an UpdateManager
 
     # Set the env var for FRED API key to avoid errors
     os.environ["FRED_API_KEY"] = "test_api_key"
 
     for source in valid_sources:
-        empty_timeseries.source = source
+        empty_timeseries._set_source(source)
         # RTDSM validates its dataset_id against the bundled catalog at
         # construction (fail-fast), so give it a real series id; the other
         # sources accept any id.
         empty_timeseries.dataset_id = "ROUTPUT" if source == "RTDSM" else "TEST"
-        update_manager = empty_timeseries._get_update_manager()
+        raw_series_key = {"country": "USA"} if source == "WDI" else {}
+        series_key = empty_timeseries.source_adapter.normalize_series_key(
+            empty_timeseries.dataset_id, raw_series_key
+        )
+        update_manager = empty_timeseries.source_adapter.create_update_manager(
+            empty_timeseries.dataset_id, series_key
+        )
 
         assert isinstance(update_manager, UpdateManager)
-
-
-def test_get_update_manager_invalid_source(empty_timeseries):
-    """Test that the MTTimeSeries._get_update_manager() raises an AssertionError for an invalid source"""
-    empty_timeseries.source = "INVALID_SOURCE"
-    with pytest.raises(AssertionError):
-        empty_timeseries._get_update_manager()
 
 
 def test_fetch_or_load_state_calls_update(empty_timeseries):
@@ -872,12 +874,10 @@ def test_init_raises_error_when_no_data_found():
 
 
 @patch(
-    "macrotrace.models.mt.time_series.MTTimeSeries._get_update_manager",
+    "macrotrace.sources.fred.FRED_SOURCE_ADAPTER.create_update_manager",
     side_effect=AssertionError("Local-only loads should not create an update manager"),
 )
-def test_init_local_fred_load_does_not_require_api_key(
-    mock_get_update_manager, monkeypatch
-):
+def test_init_local_fred_load_does_not_require_api_key(mock_create, monkeypatch):
     """Test that local-only FRED loads succeed without an API key when data is already local."""
     monkeypatch.delenv("FRED_API_KEY", raising=False)
 
@@ -914,14 +914,14 @@ def test_init_local_fred_load_does_not_require_api_key(
 
     assert ts.release_date == datetime(2023, 1, 6, tzinfo=UTC)
     assert len(ts.current_observations) == 1
-    mock_get_update_manager.assert_not_called()
+    mock_create.assert_not_called()
 
 
 @patch(
-    "macrotrace.models.mt.time_series.MTTimeSeries._get_update_manager",
+    "macrotrace.sources.ons.ONS_SOURCE_ADAPTER.create_update_manager",
     side_effect=AssertionError("Local-only loads should not create an update manager"),
 )
-def test_init_local_ons_load_does_not_create_update_manager(mock_get_update_manager):
+def test_init_local_ons_load_does_not_create_update_manager(mock_create):
     """Test that local-only ONS loads use only the local database."""
     series_key = {"geography": "K02000001"}
     dataset = Dataset.create(
@@ -977,7 +977,7 @@ def test_init_local_ons_load_does_not_create_update_manager(mock_get_update_mana
     assert ts.release_date == datetime(2023, 1, 13, tzinfo=UTC)
     assert len(ts.current_observations) == 1
     assert ts.current_observations[0].value == 101.2
-    mock_get_update_manager.assert_not_called()
+    mock_create.assert_not_called()
 
 
 def test_load_vintages_from_releases_single_release():

@@ -249,7 +249,7 @@ class Observation(DataBaseModel):
     created_at = StrictDateTimeField(default=_utc_now)
 
     class Meta:
-        constraints = [SQL("UNIQUE(release_id, observation_timestamp)")]
+        constraints = [SQL("UNIQUE(series_id, release_id, observation_timestamp)")]
 
     def __repr__(self):
         return (
